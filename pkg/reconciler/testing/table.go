@@ -38,6 +38,57 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type TransformFunc func(metav1.Object) metav1.Object
+
+type ObjectTransform struct {
+	Key       string
+	Transform TransformFunc
+}
+
+type ObjectUpdate struct {
+	Path  string
+	Value string
+}
+
+type ObjectChange struct {
+	Key     string
+	Updates []ObjectUpdate
+	// List of paths that should have been cleared
+	Deletions []string
+}
+
+type State interface{}
+type Create interface{}
+type Update interface{}
+
+type TableRow2 struct {
+	// Name is a descriptive name for this test suitable as a first argument to t.Run()
+	Name string
+
+	// Key is the parameter to reconciliation.
+	// This has the form "namespace/name".
+	Key string
+
+	// StateSetup holds both metav1.Object and ObjectTransforms to
+	// setup the initial state of the world
+	State []State
+
+	// WantErr holds whether we should expect the reconciliation to result in an error.
+	WantErr bool
+
+	// WantCreates holds the set of objects that are created during reconciliation.
+	// The set can contain literal metav1.Object or ObjectTransforms that are applied
+	// to objects provided in `State`
+	WantCreates []Create
+
+	// WantUpdates holds the set of Update calls we expect during reconciliation.
+	WantUpdates []Update
+}
+
+func (r *TableRow2) Test(t *testing.T, ctor Ctor) {
+
+}
+
 // TableRow holds a single row of our table test.
 type TableRow struct {
 	// Name is a descriptive name for this test suitable as a first argument to t.Run()
@@ -220,6 +271,16 @@ func extractActions(t *testing.T, clients ...hasActions) (
 		}
 	}
 	return
+}
+
+type TableTest2 []TableRow2
+
+func (tt TableTest2) Test(t *testing.T, ctor Ctor) {
+	for _, test := range tt {
+		t.Run(test.Name, func(t *testing.T) {
+			test.Test(t, ctor)
+		})
+	}
 }
 
 type TableTest []TableRow

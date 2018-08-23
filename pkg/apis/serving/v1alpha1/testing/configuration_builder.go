@@ -61,14 +61,6 @@ func (bldr ConfigBuilder) Object() runtime.Object {
 	return bldr.Build()
 }
 
-func (bldr ConfigBuilder) ToChildBuild(convert ConfigToBuildFunc) *buildv1alpha1.Build {
-	return convert(bldr.Build())
-}
-
-func (bldr ConfigBuilder) ToChildRevision(convert ConfigToRevisionFunc) RevisionBuilder {
-	return RevisionBuilder{convert(bldr.Build())}
-}
-
 func (bldr ConfigBuilder) ToUpdateAction() clientgotesting.UpdateActionImpl {
 	action := clientgotesting.UpdateActionImpl{}
 	action.Verb = "update"
