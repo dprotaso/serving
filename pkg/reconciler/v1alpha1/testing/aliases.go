@@ -28,6 +28,17 @@ type (
 	ActionRecorder     = testing.ActionRecorder
 	Factory            = testing.Factory
 	HookResult         = testing.HookResult
+	PhaseTest          = testing.PhaseTest
+	PhaseTests         = testing.PhaseTests
+	ReconcilerTest     = testing.ReconcilerTest
+	ReconcilerTests    = testing.ReconcilerTests
+	Creates            = testing.Creates
+	Patches            = testing.Patches
+	Failures           = testing.Failures
+	Objects            = testing.Objects
+	Updates            = testing.Updates
+	FakeClient         = testing.FakeClient
+	NullTracker        = testing.NullTracker
 )
 
 var (
@@ -39,9 +50,11 @@ var (
 	ValidateUpdates           = testing.ValidateUpdates
 	ConfigMapFromTestFile     = testing.ConfigMapFromTestFile
 
-	TestLogger = logtesting.TestLogger
+	TestLogger            = logtesting.TestLogger
+	TestContextWithLogger = logtesting.TestContextWithLogger
 )
 
 const (
-	HookComplete = testing.HookComplete
+	HookComplete   = testing.HookComplete
+	NoStatusChange = testing.NoStatusChange
 )
