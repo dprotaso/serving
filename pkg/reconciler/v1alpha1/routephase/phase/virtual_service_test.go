@@ -46,9 +46,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				simpleNotReadyConfig("default", "not-ready").Status.LatestCreatedRevisionName,
 			),
 		},
-		ExpectedPatches: Patches{
-			patchAddLabel("default", "not-ready", "serving.knative.dev/route", "first-reconcile", "v1"),
-		},
 		ExpectedStatus: v1alpha1.RouteStatus{
 			Conditions: duckv1alpha1.Conditions{{
 				Type:    v1alpha1.RouteConditionAllTrafficAssigned,
@@ -72,9 +69,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				// Use the Revision name from the config.
 				simpleFailedConfig("default", "permanently-failed").Status.LatestCreatedRevisionName,
 			),
-		},
-		ExpectedPatches: Patches{
-			patchAddLabel("default", "permanently-failed", "serving.knative.dev/route", "first-reconcile", "v1"),
 		},
 		ExpectedStatus: v1alpha1.RouteStatus{
 			Conditions: duckv1alpha1.Conditions{{
@@ -118,9 +112,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				},
 			),
 		},
-		ExpectedPatches: Patches{
-			patchAddLabel("default", "config", "serving.knative.dev/route", "becomes-ready", "v1"),
-		},
 		ExpectedStatus: v1alpha1.RouteStatus{
 			Conditions: duckv1alpha1.Conditions{{
 				Type:   v1alpha1.RouteConditionAllTrafficAssigned,
@@ -133,26 +124,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				RevisionName: "config-00001",
 				Percent:      100,
 			}},
-		},
-	}, {
-		Name: "failure labeling configuration",
-		// Start from the test case where the route becomes ready and introduce a failure updating the configuration.
-		Context:  contextWithDefaultDomain("example.com"),
-		Resource: simpleRunLatest("default", "label-config-failure", "config"),
-		Failures: Failures{
-			InduceFailure("patch", "configurations"),
-		},
-		Objects: Objects{
-			simpleReadyConfig("default", "config"),
-			simpleReadyRevision("default",
-				// Use the Revision name from the config.
-				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-			),
-		},
-		ExpectError:    true,
-		ExpectedStatus: v1alpha1.RouteStatus{},
-		ExpectedPatches: Patches{
-			patchAddLabel("default", "config", "serving.knative.dev/route", "label-config-failure", "v1"),
 		},
 	}, {
 		Name:     "failure creating virtual service",
@@ -190,19 +161,12 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				},
 			),
 		},
-		ExpectedPatches: Patches{
-			patchAddLabel("default", "config", "serving.knative.dev/route", "vs-create-failure", "v1"),
-		},
 	}, {
 		Name:     "steady state",
 		Context:  contextWithDefaultDomain("example.com"),
 		Resource: simpleRunLatest("default", "steady-state", "config"),
 		Objects: Objects{
-			addConfigLabel(
-				simpleReadyConfig("default", "config"),
-				// The Route controller attaches our label to this Configuration.
-				"serving.knative.dev/route", "steady-state",
-			),
+			simpleReadyConfig("default", "config"),
 			simpleReadyRevision("default",
 				// Use the Revision name from the config.
 				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
@@ -242,11 +206,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 		Context:  contextWithDefaultDomain("another-example.com"),
 		Resource: simpleRunLatest("default", "different-domain", "config"),
 		Objects: Objects{
-			addConfigLabel(
-				simpleReadyConfig("default", "config"),
-				// The Route controller attaches our label to this Configuration.
-				"serving.knative.dev/route", "different-domain",
-			),
+			simpleReadyConfig("default", "config"),
 			simpleReadyRevision("default",
 				// Use the Revision name from the config.
 				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
@@ -307,11 +267,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Resource: simpleRunLatest("default", "new-latest-created", "config"),
 			Objects: Objects{
 				setLatestCreatedRevision(
-					addConfigLabel(
-						simpleReadyConfig("default", "config"),
-						// The Route controller attaches our label to this Configuration.
-						"serving.knative.dev/route", "new-latest-created",
-					),
+					simpleReadyConfig("default", "config"),
 					"config-00002",
 				),
 				simpleReadyRevision("default",
@@ -356,11 +312,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Resource: simpleRunLatest("default", "new-latest-ready", "config"),
 			Objects: Objects{
 				setLatestReadyRevision(setLatestCreatedRevision(
-					addConfigLabel(
-						simpleReadyConfig("default", "config"),
-						// The Route controller attaches our label to this Configuration.
-						"serving.knative.dev/route", "new-latest-ready",
-					),
+					simpleReadyConfig("default", "config"),
 					"config-00002",
 				)),
 				simpleReadyRevision("default",
@@ -429,11 +381,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Resource: simpleRunLatest("default", "update-vs-failure", "config"),
 			Objects: Objects{
 				setLatestReadyRevision(setLatestCreatedRevision(
-					addConfigLabel(
-						simpleReadyConfig("default", "config"),
-						// The Route controller attaches our label to this Configuration.
-						"serving.knative.dev/route", "update-vs-failure",
-					),
+					simpleReadyConfig("default", "config"),
 					"config-00002",
 				)),
 				simpleReadyRevision("default",
@@ -484,11 +432,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Context:  contextWithDefaultDomain("example.com"),
 			Resource: simpleRunLatest("default", "virt-svc-mutation", "config"),
 			Objects: Objects{
-				addConfigLabel(
-					simpleReadyConfig("default", "config"),
-					// The Route controller attaches our label to this Configuration.
-					"serving.knative.dev/route", "virt-svc-mutation",
-				),
+				simpleReadyConfig("default", "config"),
 				simpleReadyRevision("default",
 					// Use the Revision name from the config.
 					simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
@@ -542,50 +486,13 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				}},
 			},
 		}, {
-			Name:        "config labelled by another route",
-			ExpectError: true,
-			Context:     contextWithDefaultDomain("example.com"),
-			Resource:    simpleRunLatest("default", "licked-cookie", "config"),
-			Objects: Objects{
-				addConfigLabel(
-					simpleReadyConfig("default", "config"),
-					// This configuration is being referenced by another Route.
-					"serving.knative.dev/route", "this-cookie-has-been-licked",
-				),
-				simpleReadyRevision("default",
-					// Use the Revision name from the config.
-					simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-				),
-				resources.MakeVirtualService2(
-					"licked-cookie.default.example.com",
-					simpleRunLatest("default", "licked-cookie", "config"),
-					&traffic.TrafficConfig{
-						Targets: map[string][]traffic.RevisionTarget{
-							"": {{
-								TrafficTarget: v1alpha1.TrafficTarget{
-									// Use the Revision name from the config.
-									RevisionName: simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-									Percent:      100,
-								},
-								Active: true,
-							}},
-						},
-					},
-				),
-			},
-			ExpectedStatus: v1alpha1.RouteStatus{},
-		}, {
 			Name: "switch to a different config",
 			// The status reflects "oldconfig", but the spec "newconfig".
 			Context:  contextWithDefaultDomain("example.com"),
 			Resource: simpleRunLatest("default", "change-configs", "newconfig"),
 			Objects: Objects{
 				// Both configs exist, but only "oldconfig" is labelled.
-				addConfigLabel(
-					simpleReadyConfig("default", "oldconfig"),
-					// The Route controller attaches our label to this Configuration.
-					"serving.knative.dev/route", "change-configs",
-				),
+				simpleReadyConfig("default", "oldconfig"),
 				simpleReadyConfig("default", "newconfig"),
 				simpleReadyRevision("default",
 					// Use the Revision name from the config.
@@ -612,10 +519,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 				resources.MakeK8sService(simpleRunLatest("default", "change-configs", "oldconfig")),
-			},
-			ExpectedPatches: Patches{
-				patchRemoveLabel("default", "oldconfig", "serving.knative.dev/route", "v1"),
-				patchAddLabel("default", "newconfig", "serving.knative.dev/route", "change-configs", "v1"),
 			},
 			ExpectedUpdates: Updates{
 				// Updated to point to "newconfig" things.
@@ -694,9 +597,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Objects: Objects{
 				simpleReadyConfig("default", "config"),
 			},
-			ExpectedPatches: Patches{
-				patchAddLabel("default", "config", "serving.knative.dev/route", "missing-revision-indirect", "v1"),
-			},
 			ExpectedStatus: v1alpha1.RouteStatus{
 				Conditions: duckv1alpha1.Conditions{{
 					Type:    v1alpha1.RouteConditionAllTrafficAssigned,
@@ -746,11 +646,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 						},
 					},
 				),
-			},
-			ExpectedPatches: Patches{
-				// TODO(#1495): The parent configuration isn't labeled because it's established through
-				// labels instead of owner references.
-				//patchAddLabel("default", "config", "serving.knative.dev/route", "pinned-becomes-ready"),
 			},
 			// Use the config's revision name.
 			ExpectedStatus: v1alpha1.RouteStatus{
@@ -829,10 +724,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 			},
-			ExpectedPatches: Patches{
-				patchAddLabel("default", "blue", "serving.knative.dev/route", "named-traffic-split", "v1"),
-				patchAddLabel("default", "green", "serving.knative.dev/route", "named-traffic-split", "v1"),
-			},
 			ExpectedStatus: v1alpha1.RouteStatus{
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
@@ -855,11 +746,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Context:  contextWithDefaultDomain("example.com"),
 			Resource: simpleRunLatest("default", "switch-configs", "green"),
 			Objects: Objects{
-				addConfigLabel(
-					simpleReadyConfig("default", "blue"),
-					// The Route controller attaches our label to this Configuration.
-					"serving.knative.dev/route", "switch-configs",
-				),
+				simpleReadyConfig("default", "blue"),
 				simpleReadyConfig("default", "green"),
 				simpleReadyRevision("default",
 					// Use the Revision name from the config.
@@ -886,10 +773,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 				resources.MakeK8sService(simpleRunLatest("default", "switch-configs", "blue")),
-			},
-			ExpectedPatches: Patches{
-				patchRemoveLabel("default", "blue", "serving.knative.dev/route", "v1"),
-				patchAddLabel("default", "green", "serving.knative.dev/route", "switch-configs", "v1"),
 			},
 			ExpectedUpdates: Updates{
 				resources.MakeVirtualService2(
@@ -922,109 +805,63 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					Percent:      100,
 				}},
 			},
-		}, {
-			Name: "failure unlabeling old configuration",
-			// Start from our test that switches configs and induce a failure when we go to unlabel
-			// the "blue" configuration.
-			ExpectError: true,
-			Failures: Failures{
-				InduceFailure("patch", "configurations"),
-			},
-			Context:  contextWithDefaultDomain("example.com"),
-			Resource: simpleRunLatest("default", "rmlabel-config-failure", "green"),
-			Objects: []runtime.Object{
-				addConfigLabel(
-					simpleReadyConfig("default", "blue"),
-					// The Route controller attaches our label to this Configuration.
-					"serving.knative.dev/route", "rmlabel-config-failure",
-				),
-				simpleReadyConfig("default", "green"),
-				simpleReadyRevision("default",
-					// Use the Revision name from the config.
-					simpleReadyConfig("default", "blue").Status.LatestReadyRevisionName,
-				),
-				simpleReadyRevision("default",
-					// Use the Revision name from the config.
-					simpleReadyConfig("default", "green").Status.LatestReadyRevisionName,
-				),
-				resources.MakeVirtualService2(
-					"rmlabel-config-failure.default.example.com",
-					simpleRunLatest("default", "rmlabel-config-failure", "blue"),
-					&traffic.TrafficConfig{
-						Targets: map[string][]traffic.RevisionTarget{
-							"": {{
-								TrafficTarget: v1alpha1.TrafficTarget{
-									// Use the Revision name from the config.
-									RevisionName: simpleReadyConfig("default", "blue").Status.LatestReadyRevisionName,
-									Percent:      100,
-								},
-								Active: true,
-							}},
-						},
-					},
-				),
-			},
-			ExpectedStatus: v1alpha1.RouteStatus{},
-			ExpectedPatches: Patches{
-				patchRemoveLabel("default", "blue", "serving.knative.dev/route", "v1"),
-			},
 		}}
 
 	scenarios.Run(t, VSPhaseSetup, VirtualService{})
 }
 
 // TODO(dprotaso)Review this alternate phase scenario invocation
-func TestVirtualServiceReconcile_FailureLabellingConfiguration(t *testing.T) {
-	oldRoute := simpleRunLatest("default", "addlabel-config-failure", "blue")
-
-	blueConfig := simpleReadyConfig("default", "blue")
-	greenConfig := simpleReadyConfig("default", "green")
-
-	blueRevision := simpleReadyRevision("default", blueConfig.Status.LatestCreatedRevisionName)
-	greenRevision := simpleReadyRevision("default", greenConfig.Status.LatestCreatedRevisionName)
-
-	virtualService := resources.MakeVirtualService2(
-		"addlabel-config-failure.default.example.com",
-		oldRoute,
-		&traffic.TrafficConfig{
-			Targets: map[string][]traffic.RevisionTarget{
-				"": {{
-					TrafficTarget: v1alpha1.TrafficTarget{
-						// Use the Revision name from the config.
-						RevisionName: simpleReadyConfig("default", "blue").Status.LatestReadyRevisionName,
-						Percent:      100,
-					},
-					Active: true,
-				}},
-			},
-		},
-	)
-
-	scenario := PhaseTest{
-		Name: "failure labeling configuration",
-		// Start from our test that switches configs, unlabel "blue" (avoids induced failure),
-		// and induce a failure when we go to label the "green" configuration.
-		ExpectError: true,
-		Failures: Failures{
-			InduceFailure("patch", "configurations"),
-		},
-		Context:  contextWithDefaultDomain("example.com"),
-		Resource: simpleRunLatest("default", "addlabel-config-failure", "green"),
-		Objects: Objects{
-			blueConfig,
-			blueRevision,
-			greenConfig,
-			greenRevision,
-			virtualService,
-		},
-		ExpectedPatches: Patches{
-			patchAddLabel("default", "green", "serving.knative.dev/route", "addlabel-config-failure", "v1"),
-		},
-		ExpectedStatus: v1alpha1.RouteStatus{},
-	}
-
-	scenario.Run(t, VSPhaseSetup, VirtualService{})
-}
+//func TestVirtualServiceReconcile_FailureLabellingConfiguration(t *testing.T) {
+//	oldRoute := simpleRunLatest("default", "addlabel-config-failure", "blue")
+//
+//	blueConfig := simpleReadyConfig("default", "blue")
+//	greenConfig := simpleReadyConfig("default", "green")
+//
+//	blueRevision := simpleReadyRevision("default", blueConfig.Status.LatestCreatedRevisionName)
+//	greenRevision := simpleReadyRevision("default", greenConfig.Status.LatestCreatedRevisionName)
+//
+//	virtualService := resources.MakeVirtualService2(
+//		"addlabel-config-failure.default.example.com",
+//		oldRoute,
+//		&traffic.TrafficConfig{
+//			Targets: map[string][]traffic.RevisionTarget{
+//				"": {{
+//					TrafficTarget: v1alpha1.TrafficTarget{
+//						// Use the Revision name from the config.
+//						RevisionName: simpleReadyConfig("default", "blue").Status.LatestReadyRevisionName,
+//						Percent:      100,
+//					},
+//					Active: true,
+//				}},
+//			},
+//		},
+//	)
+//
+//	scenario := PhaseTest{
+//		Name: "failure labeling configuration",
+//		// Start from our test that switches configs, unlabel "blue" (avoids induced failure),
+//		// and induce a failure when we go to label the "green" configuration.
+//		ExpectError: true,
+//		Failures: Failures{
+//			InduceFailure("patch", "configurations"),
+//		},
+//		Context:  contextWithDefaultDomain("example.com"),
+//		Resource: simpleRunLatest("default", "addlabel-config-failure", "green"),
+//		Objects: Objects{
+//			blueConfig,
+//			blueRevision,
+//			greenConfig,
+//			greenRevision,
+//			virtualService,
+//		},
+//		ExpectedPatches: Patches{
+//			patchAddLabel("default", "green", "serving.knative.dev/route", "addlabel-config-failure", "v1"),
+//		},
+//		ExpectedStatus: v1alpha1.RouteStatus{},
+//	}
+//
+//	scenario.Run(t, VSPhaseSetup, VirtualService{})
+//}
 
 func VSPhaseSetup(obj interface{}, objs []runtime.Object) []FakeClient {
 	vs := obj.(*VirtualService)
@@ -1157,14 +994,6 @@ func simpleReadyRevision(namespace, name string) *v1alpha1.Revision {
 			}},
 		},
 	}
-}
-
-func addConfigLabel(config *v1alpha1.Configuration, key, value string) *v1alpha1.Configuration {
-	if config.Labels == nil {
-		config.Labels = make(map[string]string)
-	}
-	config.Labels[key] = value
-	return config
 }
 
 func mutateVirtualService(vs *istiov1alpha3.VirtualService) *istiov1alpha3.VirtualService {
