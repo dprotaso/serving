@@ -32,35 +32,35 @@ func TestServiceReconcile(t *testing.T) {
 	scenarios := PhaseTests{
 		{
 			Name:     "first-reconcile",
-			Resource: simpleRunLatest("default", "first-reconcile", "not-ready", nil),
+			Resource: simpleRunLatest("default", "first-reconcile", "not-ready"),
 			ExpectedStatus: v1alpha1.RouteStatus{
 				DomainInternal: "first-reconcile.default.svc.cluster.local",
 				Targetable:     &duckv1alpha1.Targetable{DomainInternal: "first-reconcile.default.svc.cluster.local"},
 			},
 			ExpectedCreates: Creates{
 				resources.MakeK8sService(
-					simpleRunLatest("default", "first-reconcile", "not-ready", nil),
+					simpleRunLatest("default", "first-reconcile", "not-ready"),
 				),
 			},
 		}, {
 			Name:     "create-service-fails",
-			Resource: simpleRunLatest("default", "first-reconcile", "not-ready", nil),
+			Resource: simpleRunLatest("default", "first-reconcile", "not-ready"),
 			Failures: Failures{
 				InduceFailure("create", "services"),
 			},
 			ExpectError:    true,
-			ExpectedStatus: NoStatusChange,
+			ExpectedStatus: v1alpha1.RouteStatus{},
 			ExpectedCreates: Creates{
 				resources.MakeK8sService(
-					simpleRunLatest("default", "first-reconcile", "not-ready", nil),
+					simpleRunLatest("default", "first-reconcile", "not-ready"),
 				),
 			},
 		}, {
 			Name:     "steady-state",
-			Resource: simpleRunLatest("default", "steady-state", "not-ready", nil),
+			Resource: simpleRunLatest("default", "steady-state", "not-ready"),
 			Objects: Objects{
 				resources.MakeK8sService(
-					simpleRunLatest("default", "steady-state", "not-ready", nil),
+					simpleRunLatest("default", "steady-state", "not-ready"),
 				),
 			},
 			ExpectedStatus: v1alpha1.RouteStatus{
@@ -69,17 +69,17 @@ func TestServiceReconcile(t *testing.T) {
 			},
 		}, {
 			Name:     "service-spec-change",
-			Resource: simpleRunLatest("default", "service-change", "not-ready", nil),
+			Resource: simpleRunLatest("default", "service-change", "not-ready"),
 			Objects: Objects{
 				mutateService(
 					resources.MakeK8sService(
-						simpleRunLatest("default", "service-change", "not-ready", nil),
+						simpleRunLatest("default", "service-change", "not-ready"),
 					),
 				),
 			},
 			ExpectedUpdates: Updates{
 				resources.MakeK8sService(
-					simpleRunLatest("default", "service-change", "not-ready", nil),
+					simpleRunLatest("default", "service-change", "not-ready"),
 				),
 			},
 			ExpectedStatus: v1alpha1.RouteStatus{
@@ -88,11 +88,11 @@ func TestServiceReconcile(t *testing.T) {
 			},
 		}, {
 			Name:     "service-update-failed",
-			Resource: simpleRunLatest("default", "service-change", "not-ready", nil),
+			Resource: simpleRunLatest("default", "service-change", "not-ready"),
 			Objects: Objects{
 				mutateService(
 					resources.MakeK8sService(
-						simpleRunLatest("default", "service-change", "not-ready", nil),
+						simpleRunLatest("default", "service-change", "not-ready"),
 					),
 				),
 			},
@@ -100,19 +100,19 @@ func TestServiceReconcile(t *testing.T) {
 				InduceFailure("update", "services"),
 			},
 			ExpectError:    true,
-			ExpectedStatus: NoStatusChange,
+			ExpectedStatus: v1alpha1.RouteStatus{},
 			ExpectedUpdates: Updates{
 				resources.MakeK8sService(
-					simpleRunLatest("default", "service-change", "not-ready", nil),
+					simpleRunLatest("default", "service-change", "not-ready"),
 				),
 			},
 		}, {
 			Name:     "allow cluster ip",
-			Resource: simpleRunLatest("default", "cluster-ip", "config", nil),
+			Resource: simpleRunLatest("default", "cluster-ip", "config"),
 			Objects: Objects{
 				setClusterIP(
 					resources.MakeK8sService(
-						simpleRunLatest("default", "cluster-ip", "config", nil),
+						simpleRunLatest("default", "cluster-ip", "config"),
 					),
 					"127.0.0.1",
 				),
@@ -133,15 +133,15 @@ func mutateService(svc *corev1.Service) *corev1.Service {
 	return svc
 }
 
-func simpleRunLatest(namespace, name, config string, status *v1alpha1.RouteStatus) *v1alpha1.Route {
-	return routeWithTraffic(namespace, name, status, v1alpha1.TrafficTarget{
+func simpleRunLatest(namespace, name, config string) *v1alpha1.Route {
+	return routeWithTraffic(namespace, name, v1alpha1.TrafficTarget{
 		ConfigurationName: config,
 		Percent:           100,
 	})
 }
 
-func routeWithTraffic(namespace, name string, status *v1alpha1.RouteStatus, traffic ...v1alpha1.TrafficTarget) *v1alpha1.Route {
-	route := &v1alpha1.Route{
+func routeWithTraffic(namespace, name string, traffic ...v1alpha1.TrafficTarget) *v1alpha1.Route {
+	return &v1alpha1.Route{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -150,10 +150,6 @@ func routeWithTraffic(namespace, name string, status *v1alpha1.RouteStatus, traf
 			Traffic: traffic,
 		},
 	}
-	if status != nil {
-		route.Status = *status
-	}
-	return route
 }
 
 func setClusterIP(svc *corev1.Service, ip string) *corev1.Service {

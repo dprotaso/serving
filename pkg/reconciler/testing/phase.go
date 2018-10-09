@@ -32,15 +32,6 @@ import (
 	. "github.com/knative/pkg/logging/testing"
 )
 
-const (
-	// NoStatusChange is a sentinel value that is used with the
-	// PhaseScenario property ExpectStatus.
-	//
-	// If ExpectStatus is set to NoStatusChange the test will assert
-	// that there have been no changes to the resource's status
-	NoStatusChange string = "no-status-change"
-)
-
 type (
 	Failures   []clientgotesting.ReactionFunc
 	Creates    []runtime.Object
@@ -133,22 +124,13 @@ func (s *PhaseTest) Run(
 
 	clients := initTest(phase, init, s.Objects, s.Failures)
 
-	resourceCopy := s.Resource.DeepCopyObject()
-
-	err := s.invokeReconcile(t, phase)
+	status, err := s.invokeReconcile(t, phase)
 
 	if (err != nil) != s.ExpectError {
 		t.Errorf("Reconcile() error = %v, expected error %v", err, s.ExpectError)
 	}
 
-	if s.ExpectedStatus == NoStatusChange {
-		want := s.resourceStatus(resourceCopy)
-		got := s.resourceStatus(s.Resource)
-
-		if diff := cmp.Diff(want, got, cmpOpts); diff != "" {
-			t.Errorf("resource status (-want, +got) %s", diff)
-		}
-	} else if diff := cmp.Diff(s.ExpectedStatus, s.resourceStatus(s.Resource), cmpOpts); diff != "" {
+	if diff := cmp.Diff(s.ExpectedStatus, status, cmpOpts); diff != "" {
 		t.Errorf("resource status (-want, +got) %s", diff)
 	}
 
@@ -170,7 +152,7 @@ func (s *PhaseTest) resourceStatus(resource interface{}) interface{} {
 	return reflect.ValueOf(resource).Elem().FieldByName("Status").Interface()
 }
 
-func (s *PhaseTest) invokeReconcile(t *testing.T, phase interface{}) error {
+func (s *PhaseTest) invokeReconcile(t *testing.T, phase interface{}) (interface{}, error) {
 	phaseVal := reflect.ValueOf(phase)
 	ctx := context.TODO()
 
@@ -187,10 +169,13 @@ func (s *PhaseTest) invokeReconcile(t *testing.T, phase interface{}) error {
 
 	output := phaseVal.MethodByName("Reconcile").Call(input)
 
-	if output[0].IsNil() {
-		return nil
+	var err error = nil
+
+	if !output[1].IsNil() {
+		err = output[1].Interface().(error)
 	}
-	return output[0].Interface().(error)
+
+	return output[0].Interface(), err
 }
 
 func (s *PhaseTest) ensurePhaseType(t *testing.T, prototype interface{}) {
@@ -204,11 +189,18 @@ func (s *PhaseTest) ensurePhaseType(t *testing.T, prototype interface{}) {
 	phaseType = reflect.PtrTo(phaseType)
 
 	resourceType := reflect.TypeOf(s.Resource)
+	statusField, ok := resourceType.Elem().FieldByName("Status")
+
+	if !ok {
+		t.Fatalf("Resource %q must have a 'Status' field", resourceType)
+	}
+
 	method, ok := phaseType.MethodByName("Reconcile")
 
 	errMsg := fmt.Sprintf(
-		"phase should have the method Reconcile(context.Context, %s) error",
+		"phase should have the method Reconcile(context.Context, %s) (%s, error)",
 		resourceType,
+		statusField.Type,
 	)
 
 	if !ok {
@@ -231,7 +223,15 @@ func (s *PhaseTest) ensurePhaseType(t *testing.T, prototype interface{}) {
 	}
 
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
-	if method.Type.NumOut() != 1 || method.Type.Out(0) != errorType {
+	if method.Type.NumOut() != 2 {
+		t.Fatal(errMsg)
+	}
+
+	if method.Type.Out(0) != statusField.Type {
+		t.Fatal(errMsg)
+	}
+
+	if method.Type.Out(1) != errorType {
 		t.Fatal(errMsg)
 	}
 }

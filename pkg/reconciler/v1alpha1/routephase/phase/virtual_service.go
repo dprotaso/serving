@@ -75,7 +75,9 @@ func (p *VirtualService) Triggers() []reconciler.Trigger {
 	}
 }
 
-func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) error {
+func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error) {
+	var status v1alpha1.RouteStatus
+
 	logger := logging.FromContext(ctx)
 	logger.Infof("Reconciling route - virtual service")
 
@@ -86,7 +88,7 @@ func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) e
 		// Traffic stanza change.
 		for _, configuration := range t.Configurations {
 			if err := p.Tracker.Track(objectRef(configuration), route); err != nil {
-				return err
+				return status, err
 			}
 		}
 		for _, revision := range t.Revisions {
@@ -94,7 +96,7 @@ func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) e
 				logger.Infof("Revision %s/%s is inactive", revision.Namespace, revision.Name)
 			}
 			if err := p.Tracker.Track(objectRef(revision), route); err != nil {
-				return err
+				return status, err
 			}
 		}
 	}
@@ -103,29 +105,32 @@ func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) e
 	if err != nil && !isTargetError {
 		// An error that's not due to missing traffic target should
 		// make us fail fast.
-		route.Status.MarkUnknownTrafficError(err.Error())
-		return err
+		status.MarkUnknownTrafficError(err.Error())
+		return status, err
 	}
 	// If the only errors are missing traffic target, we need to
 	// update the labels first, so that when these targets recover we
 	// receive an update.
 	if err := p.syncLabels(logger, route, t); err != nil {
-		return err
+		return status, err
 	}
 	if badTarget != nil && isTargetError {
-		badTarget.MarkBadTrafficTarget(&route.Status)
+		badTarget.MarkBadTrafficTarget(&status)
 
 		// Traffic targets aren't ready, no need to configure Route.
-		return nil
+		return status, nil
 	}
 	logger.Info("All referred targets are routable.  Creating Istio VirtualService.")
-	if err := p.reconcileService(logger, route, resources.MakeVirtualService(route, t)); err != nil {
-		return err
+
+	domain := routeDomain(ctx, route)
+	desired := resources.MakeVirtualService2(domain, route, t)
+	if err := p.reconcileService(logger, route, desired); err != nil {
+		return status, err
 	}
 	logger.Info("VirtualService created, marking AllTrafficAssigned with traffic information.")
-	route.Status.Traffic = t.GetRevisionTrafficTargets()
-	route.Status.MarkTrafficAssigned()
-	return nil
+	status.Traffic = t.GetRevisionTrafficTargets()
+	status.MarkTrafficAssigned()
+	return status, nil
 }
 
 func (p *VirtualService) reconcileService(

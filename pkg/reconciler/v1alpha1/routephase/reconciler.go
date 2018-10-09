@@ -36,7 +36,7 @@ import (
 
 type RoutePhase interface {
 	reconciler.Phase
-	Reconcile(ctx context.Context, route *v1alpha1.Route) error
+	Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error)
 }
 
 type Reconciler struct {
@@ -109,7 +109,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, key string) error {
 
 	// Reconcile this copy of the route and then write back any status
 	// updates regardless of whether the reconciliation errored out.
-	err = r.reconcilePhases(ctx, route)
+	err = r.reconcilePhases(ctx, logger, route)
 	if equality.Semantic.DeepEqual(original.Status, route.Status) {
 		// If we didn't change anything then don't call updateStatus.
 		// This is important because the copy we loaded from the informer's
@@ -124,12 +124,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, key string) error {
 	return err
 }
 
-func (r *Reconciler) reconcilePhases(ctx context.Context, route *v1alpha1.Route) error {
+func (r *Reconciler) reconcilePhases(ctx context.Context, logger *zap.SugaredLogger, route *v1alpha1.Route) error {
 	route.Status.InitializeConditions()
 
 	for _, phase := range r.RoutePhases {
-		if err := phase.Reconcile(ctx, route); err != nil {
-			return err
+		status, rerr := phase.Reconcile(ctx, route)
+
+		if err := route.Status.MergePartial(&status); err != nil {
+			// TODO(dprtoaso) Consider failing and returning an error
+			//
+			// Merge fails when argument types are different - this shouldn't happen (for route status)
+			// or
+			// when a provided transformer returns an error - this shouldn't happen (for route status)
+			logger.Warnf("merging route status failed: ", err)
+		}
+
+		if rerr != nil {
+			return rerr
 		}
 	}
 	return nil

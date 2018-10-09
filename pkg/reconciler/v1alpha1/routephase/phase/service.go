@@ -48,7 +48,8 @@ func (p *K8sService) Triggers() []reconciler.Trigger {
 	}}
 }
 
-func (p *K8sService) Reconcile(ctx context.Context, route *v1alpha1.Route) error {
+func (p *K8sService) Reconcile(ctx context.Context, route *v1alpha1.Route) (status v1alpha1.RouteStatus, err error) {
+
 	logger := logging.FromContext(ctx)
 	logger.Infof("Reconciling route - kubernetes service")
 
@@ -64,18 +65,18 @@ func (p *K8sService) Reconcile(ctx context.Context, route *v1alpha1.Route) error
 	}
 
 	if err != nil {
-		return err
+		return
 	}
 
 	// Update the information that makes us Targetable.
-	route.Status.DomainInternal = names.K8sServiceFullname(route)
-	route.Status.Targetable = &duckv1alpha1.Targetable{
+	status.DomainInternal = names.K8sServiceFullname(route)
+	status.Targetable = &duckv1alpha1.Targetable{
 		DomainInternal: names.K8sServiceFullname(route),
 	}
 
 	// TODO(mattmoor): This is where we'd look at the state of the Service and
 	// reflect any necessary state into the Route.
-	return nil
+	return
 }
 
 func (p *K8sService) create(logger *zap.SugaredLogger, route *v1alpha1.Route) error {

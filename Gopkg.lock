@@ -276,12 +276,12 @@
   revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
 
 [[projects]]
-  digest = "1:67b7978e7075ca49f622605dec690bbed9c5be4f06d08d727ee74f8969bcbbbb"
+  digest = "1:9a52adf44086cead3b384e5d0dbf7a1c1cce65e67552ee3383a8561c42a18cd3"
   name = "github.com/imdario/mergo"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "f1ac5984e69fed03e0574a92f70c59f132616ea2"
-  version = "0.3.0"
+  revision = "9f23e2d6bd2a77f959b2bf6acdbefd708a83a4a4"
+  version = "v0.3.6"
 
 [[projects]]
   digest = "1:ac6d01547ec4f7f673311b4663909269bfb8249952de3279799289467837c3cc"
@@ -1028,6 +1028,7 @@
     "github.com/google/go-containerregistry/pkg/v1/random",
     "github.com/google/go-containerregistry/pkg/v1/remote",
     "github.com/gorilla/websocket",
+    "github.com/imdario/mergo",
     "github.com/knative/build/pkg/apis/build/v1alpha1",
     "github.com/knative/caching/pkg/apis/caching",
     "github.com/knative/caching/pkg/apis/caching/v1alpha1",

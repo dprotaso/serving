@@ -125,32 +125,7 @@ func TestRouteReconcile_DelegatesToPhases(t *testing.T) {
 	if got := secondPhase.reconcileInvocations; got != 1 {
 		t.Errorf("Expected the first phase to be reconciled only once - got %d", got)
 	}
-} /*
-
-func TestRouteReconciler_MergesTriggers(t *testing.T) {
-	mockPhase := &mockPhase{
-		triggers: []reconciler.Trigger{{
-			Resource: v1alpha1.SchemeGroupVersion.WithResource("Something"),
-		}},
-	}
-
-	r := &Reconciler{
-		Phases: []Phase{mockPhase},
-	}
-
-	want := []reconciler.Trigger{{
-		Resource:    v1alpha1.SchemeGroupVersion.WithResource("Route"),
-		EnqueueType: reconciler.EnqueueResource,
-	}, {
-		Resource: v1alpha1.SchemeGroupVersion.WithResource("Something"),
-	}}
-
-	got := r.Triggers()
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("Unexpected triggers (-want, +got) %s", diff)
-	}
-}*/
+}
 
 func newTestPrototype(c reconciler.Common) reconciler.Reconciler {
 	return &Reconciler{
@@ -177,17 +152,17 @@ type mockPhase struct {
 	triggers             []reconciler.Trigger
 	route                *v1alpha1.Route
 	reconcileInvocations int
-	reconcile            func(context.Context, *v1alpha1.Route) error
+	reconcile            func(context.Context, *v1alpha1.Route) (v1alpha1.RouteStatus, error)
 }
 
-func (p *mockPhase) Reconcile(ctx context.Context, route *v1alpha1.Route) error {
+func (p *mockPhase) Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error) {
 	p.reconcileInvocations++
 	p.route = route.DeepCopy()
 
 	if p.reconcile != nil {
-		p.reconcile(ctx, route)
+		return p.reconcile(ctx, route)
 	}
-	return nil
+	return v1alpha1.RouteStatus{}, nil
 }
 
 func (p *mockPhase) Triggers() []reconciler.Trigger {

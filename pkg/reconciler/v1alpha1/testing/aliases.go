@@ -55,6 +55,5 @@ var (
 )
 
 const (
-	HookComplete   = testing.HookComplete
-	NoStatusChange = testing.NoStatusChange
+	HookComplete = testing.HookComplete
 )
