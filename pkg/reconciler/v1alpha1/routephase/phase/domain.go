@@ -33,12 +33,13 @@ func (p *Domain) Triggers() []reconciler.Trigger {
 	return nil
 }
 
-func (p *Domain) Reconcile(ctx context.Context, route *v1alpha1.Route) error {
-	route.Status.Domain = routeDomain(ctx, route)
-	route.Status.Targetable = &duckv1alpha1.Targetable{
-		DomainInternal: names.K8sServiceFullname(route),
-	}
-	return nil
+func (p *Domain) Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error) {
+	return v1alpha1.RouteStatus{
+		Domain: routeDomain(ctx, route),
+		Targetable: &duckv1alpha1.Targetable{
+			DomainInternal: names.K8sServiceFullname(route),
+		},
+	}, nil
 }
 
 // TODO(dprotaso) should we just consolidate this with virtual service reconciler?

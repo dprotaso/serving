@@ -37,7 +37,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 	scenarios := PhaseTests{{
 		// When the configuration is not ready there should be
 		Name:     "configuration not yet ready",
-		Resource: simpleRunLatest("default", "first-reconcile", "not-ready", nil),
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "first-reconcile", "not-ready"),
 		Objects: Objects{
 			simpleNotReadyConfig("default", "not-ready"),
 			simpleNotReadyRevision("default",
@@ -63,7 +64,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 		},
 	}, {
 		Name:     "configuration permanently failed",
-		Resource: simpleRunLatest("default", "first-reconcile", "permanently-failed", nil),
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "first-reconcile", "permanently-failed"),
 		Objects: []runtime.Object{
 			simpleFailedConfig("default", "permanently-failed"),
 			simpleFailedRevision("default",
@@ -88,11 +90,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			}},
 		},
 	}, {
-		Name: "simple route becomes ready",
-		Resource: setDomain(
-			simpleRunLatest("default", "becomes-ready", "config", nil),
-			"becomes-ready.default.example.com",
-		),
+		Name:     "simple route becomes ready",
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "becomes-ready", "config"),
 		Objects: Objects{
 			simpleReadyConfig("default", "config"),
 			simpleReadyRevision("default",
@@ -101,11 +101,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			),
 		},
 		ExpectedCreates: Creates{
-			resources.MakeVirtualService(
-				setDomain(
-					simpleRunLatest("default", "becomes-ready", "config", nil),
-					"becomes-ready.default.example.com",
-				),
+			resources.MakeVirtualService2(
+				"becomes-ready.default.example.com",
+				simpleRunLatest("default", "becomes-ready", "config"),
 				&traffic.TrafficConfig{
 					Targets: map[string][]traffic.RevisionTarget{
 						"": {{
@@ -124,8 +122,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			patchAddLabel("default", "config", "serving.knative.dev/route", "becomes-ready", "v1"),
 		},
 		ExpectedStatus: v1alpha1.RouteStatus{
-			// TODO(dprotaso) 'Domain' value comes from the route test fixture
-			Domain: "becomes-ready.default.example.com",
 			Conditions: duckv1alpha1.Conditions{{
 				Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 				Status: corev1.ConditionTrue,
@@ -141,7 +137,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 	}, {
 		Name: "failure labeling configuration",
 		// Start from the test case where the route becomes ready and introduce a failure updating the configuration.
-		Resource: simpleRunLatest("default", "label-config-failure", "config", nil),
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "label-config-failure", "config"),
 		Failures: Failures{
 			InduceFailure("patch", "configurations"),
 		},
@@ -153,16 +150,14 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			),
 		},
 		ExpectError:    true,
-		ExpectedStatus: NoStatusChange,
+		ExpectedStatus: v1alpha1.RouteStatus{},
 		ExpectedPatches: Patches{
 			patchAddLabel("default", "config", "serving.knative.dev/route", "label-config-failure", "v1"),
 		},
 	}, {
-		Name: "failure creating virtual service",
-		Resource: setDomain(
-			simpleRunLatest("default", "vs-create-failure", "config", nil),
-			"vs-create-failure.default.example.com",
-		),
+		Name:     "failure creating virtual service",
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "vs-create-failure", "config"),
 		Objects: Objects{
 			simpleReadyConfig("default", "config"),
 			simpleReadyRevision("default",
@@ -175,14 +170,12 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			InduceFailure("create", "virtualservices"),
 		},
 		ExpectError:    true,
-		ExpectedStatus: NoStatusChange,
+		ExpectedStatus: v1alpha1.RouteStatus{},
 		ExpectedCreates: Creates{
 			// This is the Create we see for the virtual service, but we induce a failure.
-			resources.MakeVirtualService(
-				setDomain(
-					simpleRunLatest("default", "vs-create-failure", "config", nil),
-					"vs-create-failure.default.example.com",
-				),
+			resources.MakeVirtualService2(
+				"vs-create-failure.default.example.com",
+				simpleRunLatest("default", "vs-create-failure", "config"),
 				&traffic.TrafficConfig{
 					Targets: map[string][]traffic.RevisionTarget{
 						"": {{
@@ -201,22 +194,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			patchAddLabel("default", "config", "serving.knative.dev/route", "vs-create-failure", "v1"),
 		},
 	}, {
-		Name: "steady state",
-		Resource: simpleRunLatest("default", "steady-state", "config", &v1alpha1.RouteStatus{
-			Domain:         "steady-state.default.example.com",
-			DomainInternal: "steady-state.default.svc.cluster.local",
-			Conditions: duckv1alpha1.Conditions{{
-				Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-				Status: corev1.ConditionTrue,
-			}, {
-				Type:   v1alpha1.RouteConditionReady,
-				Status: corev1.ConditionTrue,
-			}},
-			Traffic: []v1alpha1.TrafficTarget{{
-				RevisionName: "config-00001",
-				Percent:      100,
-			}},
-		}),
+		Name:     "steady state",
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "steady-state", "config"),
 		Objects: Objects{
 			addConfigLabel(
 				simpleReadyConfig("default", "config"),
@@ -227,73 +207,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				// Use the Revision name from the config.
 				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
 			),
-			resources.MakeVirtualService(
-				setDomain(
-					simpleRunLatest("default", "steady-state", "config", nil),
-					"steady-state.default.example.com",
-				),
-				&traffic.TrafficConfig{
-					Targets: map[string][]traffic.RevisionTarget{
-						"": {{
-							TrafficTarget: v1alpha1.TrafficTarget{
-								// Use the Revision name from the config.
-								RevisionName: simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-								Percent:      100,
-							},
-							Active: true,
-						}},
-					},
-				},
-			),
-		},
-		ExpectedStatus: NoStatusChange,
-	}, {
-		Name: "different domain",
-		Resource: simpleRunLatest("default", "different-domain", "config", &v1alpha1.RouteStatus{
-			// Previously the the service was reconciled with 'example.com'
-			Domain:         "different-domain.default.another-example.com",
-			DomainInternal: "different-domain.default.svc.cluster.local",
-			Conditions: duckv1alpha1.Conditions{{
-				Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-				Status: corev1.ConditionTrue,
-			}, {
-				Type:   v1alpha1.RouteConditionReady,
-				Status: corev1.ConditionTrue,
-			}},
-			Traffic: []v1alpha1.TrafficTarget{{
-				RevisionName: "config-00001",
-				Percent:      100,
-			}},
-		}),
-		Objects: Objects{
-			addConfigLabel(
-				simpleReadyConfig("default", "config"),
-				// The Route controller attaches our label to this Configuration.
-				"serving.knative.dev/route", "different-domain",
-			),
-			simpleReadyRevision("default",
-				// Use the Revision name from the config.
-				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-			),
-			resources.MakeVirtualService(
-				setDomain(simpleRunLatest("default", "different-domain", "config", nil), "different-domain.default.example.com"),
-				&traffic.TrafficConfig{
-					Targets: map[string][]traffic.RevisionTarget{
-						"": {{
-							TrafficTarget: v1alpha1.TrafficTarget{
-								// Use the Revision name from the config.
-								RevisionName: simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-								Percent:      100,
-							},
-							Active: true,
-						}},
-					},
-				},
-			),
-		},
-		ExpectedUpdates: Updates{
-			resources.MakeVirtualService(
-				setDomain(simpleRunLatest("default", "different-domain", "config", nil), "different-domain.default.another-example.com"),
+			resources.MakeVirtualService2(
+				"steady-state.default.example.com",
+				simpleRunLatest("default", "steady-state", "config"),
 				&traffic.TrafficConfig{
 					Targets: map[string][]traffic.RevisionTarget{
 						"": {{
@@ -309,10 +225,68 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			),
 		},
 		ExpectedStatus: v1alpha1.RouteStatus{
-			// TODO(dprotaso) 'Domain' value comes from the route test fixture
-			Domain: "different-domain.default.another-example.com",
-			// TODO(dprotaso) 'DomainInternal' value comes from the route test fixture
-			DomainInternal: "different-domain.default.svc.cluster.local",
+			Conditions: duckv1alpha1.Conditions{{
+				Type:   v1alpha1.RouteConditionAllTrafficAssigned,
+				Status: corev1.ConditionTrue,
+			}, {
+				Type:   v1alpha1.RouteConditionReady,
+				Status: corev1.ConditionTrue,
+			}},
+			Traffic: []v1alpha1.TrafficTarget{{
+				RevisionName: "config-00001",
+				Percent:      100,
+			}},
+		},
+	}, {
+		Name:     "different domain",
+		Context:  contextWithDefaultDomain("another-example.com"),
+		Resource: simpleRunLatest("default", "different-domain", "config"),
+		Objects: Objects{
+			addConfigLabel(
+				simpleReadyConfig("default", "config"),
+				// The Route controller attaches our label to this Configuration.
+				"serving.knative.dev/route", "different-domain",
+			),
+			simpleReadyRevision("default",
+				// Use the Revision name from the config.
+				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
+			),
+			resources.MakeVirtualService2(
+				"different-domain.default.example.com",
+				simpleRunLatest("default", "different-domain", "config"),
+				&traffic.TrafficConfig{
+					Targets: map[string][]traffic.RevisionTarget{
+						"": {{
+							TrafficTarget: v1alpha1.TrafficTarget{
+								// Use the Revision name from the config.
+								RevisionName: simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
+								Percent:      100,
+							},
+							Active: true,
+						}},
+					},
+				},
+			),
+		},
+		ExpectedUpdates: Updates{
+			resources.MakeVirtualService2(
+				"different-domain.default.another-example.com",
+				simpleRunLatest("default", "different-domain", "config"),
+				&traffic.TrafficConfig{
+					Targets: map[string][]traffic.RevisionTarget{
+						"": {{
+							TrafficTarget: v1alpha1.TrafficTarget{
+								// Use the Revision name from the config.
+								RevisionName: simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
+								Percent:      100,
+							},
+							Active: true,
+						}},
+					},
+				},
+			),
+		},
+		ExpectedStatus: v1alpha1.RouteStatus{
 			Conditions: duckv1alpha1.Conditions{{
 				Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 				Status: corev1.ConditionTrue,
@@ -328,22 +302,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 	},
 		{
 			// A new LatestCreatedRevisionName on the Configuration alone should result in no changes to the Route.
-			Name: "new latest created revision",
-			Resource: simpleRunLatest("default", "new-latest-created", "config", &v1alpha1.RouteStatus{
-				Domain:         "new-latest-created.default.example.com",
-				DomainInternal: "new-latest-created.default.svc.cluster.local",
-				Conditions: duckv1alpha1.Conditions{{
-					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-					Status: corev1.ConditionTrue,
-				}, {
-					Type:   v1alpha1.RouteConditionReady,
-					Status: corev1.ConditionTrue,
-				}},
-				Traffic: []v1alpha1.TrafficTarget{{
-					RevisionName: "config-00001",
-					Percent:      100,
-				}},
-			}),
+			Name:     "new latest created revision",
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "new-latest-created", "config"),
 			Objects: Objects{
 				setLatestCreatedRevision(
 					addConfigLabel(
@@ -359,8 +320,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 				// This is the name of the new revision we're referencing above.
 				simpleNotReadyRevision("default", "config-00002"),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "new-latest-created", "config", nil), "new-latest-created.default.example.com"),
+				resources.MakeVirtualService2(
+					"new-latest-created.default.example.com",
+					simpleRunLatest("default", "new-latest-created", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -375,12 +337,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 			},
-			ExpectedStatus: NoStatusChange,
-		}, {
-			Name: "new latest ready revision",
-			Resource: simpleRunLatest("default", "new-latest-ready", "config", &v1alpha1.RouteStatus{
-				Domain:         "new-latest-ready.default.example.com",
-				DomainInternal: "new-latest-ready.default.svc.cluster.local",
+			ExpectedStatus: v1alpha1.RouteStatus{
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -392,7 +349,11 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					RevisionName: "config-00001",
 					Percent:      100,
 				}},
-			}),
+			},
+		}, {
+			Name:     "new latest ready revision",
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "new-latest-ready", "config"),
 			Objects: Objects{
 				setLatestReadyRevision(setLatestCreatedRevision(
 					addConfigLabel(
@@ -408,8 +369,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 				// This is the name of the new revision we're referencing above.
 				simpleReadyRevision("default", "config-00002"),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "new-latest-ready", "config", nil), "new-latest-ready.default.example.com"),
+				resources.MakeVirtualService2(
+					"new-latest-ready.default.example.com",
+					simpleRunLatest("default", "new-latest-ready", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -426,8 +388,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 			// A new LatestReadyRevisionName on the Configuration should result in the new Revision being rolled out.
 			ExpectedUpdates: Updates{
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "new-latest-ready", "config", nil), "new-latest-ready.default.example.com"),
+				resources.MakeVirtualService2(
+					"new-latest-ready.default.example.com",
+					simpleRunLatest("default", "new-latest-ready", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -443,10 +406,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 			},
 			ExpectedStatus: v1alpha1.RouteStatus{
-				// TODO(dprotaso) 'Domain' value comes from the route test fixture
-				Domain: "new-latest-ready.default.example.com",
-				// TODO(dprotaso) 'DomainInternal' value comes from the route test fixture
-				DomainInternal: "new-latest-ready.default.svc.cluster.local",
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -466,21 +425,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Failures: Failures{
 				InduceFailure("update", "virtualservices"),
 			},
-			Resource: simpleRunLatest("default", "update-vs-failure", "config", &v1alpha1.RouteStatus{
-				Domain:         "update-vs-failure.default.example.com",
-				DomainInternal: "update-vs-failure.default.svc.cluster.local",
-				Conditions: duckv1alpha1.Conditions{{
-					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-					Status: corev1.ConditionTrue,
-				}, {
-					Type:   v1alpha1.RouteConditionReady,
-					Status: corev1.ConditionTrue,
-				}},
-				Traffic: []v1alpha1.TrafficTarget{{
-					RevisionName: "config-00001",
-					Percent:      100,
-				}},
-			}),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "update-vs-failure", "config"),
 			Objects: Objects{
 				setLatestReadyRevision(setLatestCreatedRevision(
 					addConfigLabel(
@@ -496,8 +442,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 				// This is the name of the new revision we're referencing above.
 				simpleReadyRevision("default", "config-00002"),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "update-vs-failure", "config", nil), "update-vs-failure.default.example.com"),
+				resources.MakeVirtualService2(
+					"update-vs-failure.default.example.com",
+					simpleRunLatest("default", "update-vs-failure", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -511,11 +458,12 @@ func TestVirtualServiceReconcile(t *testing.T) {
 						},
 					},
 				),
-				resources.MakeK8sService(simpleRunLatest("default", "update-vs-failure", "config", nil)),
+				resources.MakeK8sService(simpleRunLatest("default", "update-vs-failure", "config")),
 			},
 			ExpectedUpdates: Updates{
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "update-vs-failure", "config", nil), "update-vs-failure.default.example.com"),
+				resources.MakeVirtualService2(
+					"update-vs-failure.default.example.com",
+					simpleRunLatest("default", "update-vs-failure", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -530,24 +478,11 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 			},
-			ExpectedStatus: NoStatusChange,
+			ExpectedStatus: v1alpha1.RouteStatus{},
 		}, {
-			Name: "reconcile virtual service mutation",
-			Resource: simpleRunLatest("default", "virt-svc-mutation", "config", &v1alpha1.RouteStatus{
-				Domain:         "virt-svc-mutation.default.example.com",
-				DomainInternal: "virt-svc-mutation.default.svc.cluster.local",
-				Conditions: duckv1alpha1.Conditions{{
-					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-					Status: corev1.ConditionTrue,
-				}, {
-					Type:   v1alpha1.RouteConditionReady,
-					Status: corev1.ConditionTrue,
-				}},
-				Traffic: []v1alpha1.TrafficTarget{{
-					RevisionName: "config-00001",
-					Percent:      100,
-				}},
-			}),
+			Name:     "reconcile virtual service mutation",
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "virt-svc-mutation", "config"),
 			Objects: Objects{
 				addConfigLabel(
 					simpleReadyConfig("default", "config"),
@@ -558,8 +493,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					// Use the Revision name from the config.
 					simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
 				),
-				mutateVirtualService(resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "virt-svc-mutation", "config", nil), "virt-svc-mutation.default.example.com"),
+				mutateVirtualService(resources.MakeVirtualService2(
+					"virt-svc-mutation.default.example.com",
+					simpleRunLatest("default", "virt-svc-mutation", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -575,8 +511,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				)),
 			},
 			ExpectedUpdates: Updates{
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "virt-svc-mutation", "config", nil), "virt-svc-mutation.default.example.com"),
+				resources.MakeVirtualService2(
+					"virt-svc-mutation.default.example.com",
+					simpleRunLatest("default", "virt-svc-mutation", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -591,13 +528,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 			},
-			ExpectedStatus: NoStatusChange,
-		}, {
-			Name:        "config labelled by another route",
-			ExpectError: true,
-			Resource: simpleRunLatest("default", "licked-cookie", "config", &v1alpha1.RouteStatus{
-				Domain:         "licked-cookie.default.example.com",
-				DomainInternal: "licked-cookie.default.svc.cluster.local",
+			ExpectedStatus: v1alpha1.RouteStatus{
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -609,7 +540,12 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					RevisionName: "config-00001",
 					Percent:      100,
 				}},
-			}),
+			},
+		}, {
+			Name:        "config labelled by another route",
+			ExpectError: true,
+			Context:     contextWithDefaultDomain("example.com"),
+			Resource:    simpleRunLatest("default", "licked-cookie", "config"),
 			Objects: Objects{
 				addConfigLabel(
 					simpleReadyConfig("default", "config"),
@@ -620,8 +556,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					// Use the Revision name from the config.
 					simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
 				),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "licked-cookie", "config", nil), "licked-cookie.default.example.com"),
+				resources.MakeVirtualService2(
+					"licked-cookie.default.example.com",
+					simpleRunLatest("default", "licked-cookie", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -636,25 +573,12 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 			},
-			ExpectedStatus: NoStatusChange,
+			ExpectedStatus: v1alpha1.RouteStatus{},
 		}, {
 			Name: "switch to a different config",
 			// The status reflects "oldconfig", but the spec "newconfig".
-			Resource: simpleRunLatest("default", "change-configs", "newconfig", &v1alpha1.RouteStatus{
-				Domain:         "change-configs.default.example.com",
-				DomainInternal: "change-configs.default.svc.cluster.local",
-				Conditions: duckv1alpha1.Conditions{{
-					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-					Status: corev1.ConditionTrue,
-				}, {
-					Type:   v1alpha1.RouteConditionReady,
-					Status: corev1.ConditionTrue,
-				}},
-				Traffic: []v1alpha1.TrafficTarget{{
-					RevisionName: "oldconfig-00001",
-					Percent:      100,
-				}},
-			}),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "change-configs", "newconfig"),
 			Objects: Objects{
 				// Both configs exist, but only "oldconfig" is labelled.
 				addConfigLabel(
@@ -671,8 +595,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					// Use the Revision name from the config.
 					simpleReadyConfig("default", "newconfig").Status.LatestReadyRevisionName,
 				),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "change-configs", "oldconfig", nil), "change-configs.default.example.com"),
+				resources.MakeVirtualService2(
+					"change-configs.default.example.com",
+					simpleRunLatest("default", "change-configs", "oldconfig"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -686,7 +611,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 						},
 					},
 				),
-				resources.MakeK8sService(simpleRunLatest("default", "change-configs", "oldconfig", nil)),
+				resources.MakeK8sService(simpleRunLatest("default", "change-configs", "oldconfig")),
 			},
 			ExpectedPatches: Patches{
 				patchRemoveLabel("default", "oldconfig", "serving.knative.dev/route", "v1"),
@@ -694,8 +619,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 			ExpectedUpdates: Updates{
 				// Updated to point to "newconfig" things.
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "change-configs", "newconfig", nil), "change-configs.default.example.com"),
+				resources.MakeVirtualService2(
+					"change-configs.default.example.com",
+					simpleRunLatest("default", "change-configs", "newconfig"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -712,10 +638,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 			// Status updated to "newconfig"
 			ExpectedStatus: v1alpha1.RouteStatus{
-				// TODO(dprotaso) 'Domain' value comes from the route test fixture
-				Domain: "change-configs.default.example.com",
-				// TODO(dprotaso) 'DomainInternal' value comes from the route test fixture
-				DomainInternal: "change-configs.default.svc.cluster.local",
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -730,7 +652,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 		}, {
 			Name:     "configuration missing",
-			Resource: simpleRunLatest("default", "config-missing", "not-found", nil),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "config-missing", "not-found"),
 			ExpectedStatus: v1alpha1.RouteStatus{
 				Conditions: duckv1alpha1.Conditions{{
 					Type:    v1alpha1.RouteConditionAllTrafficAssigned,
@@ -746,7 +669,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 		}, {
 			Name:     "revision missing (direct)",
-			Resource: simplePinned("default", "missing-revision-direct", "not-found", nil),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simplePinned("default", "missing-revision-direct", "not-found"),
 			Objects: Objects{
 				simpleReadyConfig("default", "config"),
 			},
@@ -765,7 +689,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 		}, {
 			Name:     "revision missing (indirect)",
-			Resource: simpleRunLatest("default", "missing-revision-indirect", "config", nil),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "missing-revision-indirect", "config"),
 			Objects: Objects{
 				simpleReadyConfig("default", "config"),
 			},
@@ -786,16 +711,13 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				}},
 			},
 		}, {
-			Name: "pinned route becomes ready",
-			Resource: setDomain(
-				simplePinned(
-					"default",
-					"pinned-becomes-ready",
-					// Use the Revision name from the config
-					simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
-					nil,
-				),
-				"pinned-becomes-ready.default.example.com",
+			Name:    "pinned route becomes ready",
+			Context: contextWithDefaultDomain("example.com"),
+			Resource: simplePinned(
+				"default",
+				"pinned-becomes-ready",
+				// Use the Revision name from the config
+				simpleReadyConfig("default", "config").Status.LatestReadyRevisionName,
 			),
 			Objects: Objects{
 				simpleReadyConfig("default", "config"),
@@ -808,8 +730,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 			},
 			ExpectedCreates: Creates{
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "pinned-becomes-ready", "config", nil), "pinned-becomes-ready.default.example.com"),
+				resources.MakeVirtualService2(
+					"pinned-becomes-ready.default.example.com",
+					simpleRunLatest("default", "pinned-becomes-ready", "config"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -831,8 +754,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 			// Use the config's revision name.
 			ExpectedStatus: v1alpha1.RouteStatus{
-				// TODO(dprotaso) 'Domain' value comes from the route test fixture
-				Domain: "pinned-becomes-ready.default.example.com",
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -848,18 +769,16 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				}},
 			},
 		}, {
-			Name: "traffic split becomes ready",
-			Resource: setDomain(
-				routeWithTraffic("default", "named-traffic-split", nil,
-					v1alpha1.TrafficTarget{
-						ConfigurationName: "blue",
-						Percent:           50,
-					}, v1alpha1.TrafficTarget{
-						ConfigurationName: "green",
-						Percent:           50,
-					}),
-				"named-traffic-split.default.example.com",
-			),
+			Name:    "traffic split becomes ready",
+			Context: contextWithDefaultDomain("example.com"),
+			Resource: routeWithTraffic("default", "named-traffic-split",
+				v1alpha1.TrafficTarget{
+					ConfigurationName: "blue",
+					Percent:           50,
+				}, v1alpha1.TrafficTarget{
+					ConfigurationName: "green",
+					Percent:           50,
+				}),
 			Objects: Objects{
 				simpleReadyConfig("default", "blue"),
 				simpleReadyConfig("default", "green"),
@@ -879,15 +798,16 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 			},
 			ExpectedCreates: Creates{
-				resources.MakeVirtualService(
-					setDomain(routeWithTraffic("default", "named-traffic-split", nil,
+				resources.MakeVirtualService2(
+					"named-traffic-split.default.example.com",
+					routeWithTraffic("default", "named-traffic-split",
 						v1alpha1.TrafficTarget{
 							ConfigurationName: "blue",
 							Percent:           50,
 						}, v1alpha1.TrafficTarget{
 							ConfigurationName: "green",
 							Percent:           50,
-						}), "named-traffic-split.default.example.com"),
+						}),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -914,8 +834,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				patchAddLabel("default", "green", "serving.knative.dev/route", "named-traffic-split", "v1"),
 			},
 			ExpectedStatus: v1alpha1.RouteStatus{
-				// TODO(dprotaso) 'Domain' value comes from the route test fixture
-				Domain: "named-traffic-split.default.example.com",
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -934,20 +852,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 		}, {
 			Name: "change route configuration",
 			// Start from a steady state referencing "blue", and modify the route spec to point to "green" instead.
-			Resource: simpleRunLatest("default", "switch-configs", "green", &v1alpha1.RouteStatus{
-				Domain: "switch-configs.default.example.com",
-				Conditions: duckv1alpha1.Conditions{{
-					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-					Status: corev1.ConditionTrue,
-				}, {
-					Type:   v1alpha1.RouteConditionReady,
-					Status: corev1.ConditionTrue,
-				}},
-				Traffic: []v1alpha1.TrafficTarget{{
-					RevisionName: "blue-00001",
-					Percent:      100,
-				}},
-			}),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "switch-configs", "green"),
 			Objects: Objects{
 				addConfigLabel(
 					simpleReadyConfig("default", "blue"),
@@ -963,8 +869,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					// Use the Revision name from the config.
 					simpleReadyConfig("default", "green").Status.LatestReadyRevisionName,
 				),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "switch-configs", "blue", nil), "switch-configs.default.example.com"),
+				resources.MakeVirtualService2(
+					"switch-configs.default.example.com",
+					simpleRunLatest("default", "switch-configs", "blue"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -978,15 +885,16 @@ func TestVirtualServiceReconcile(t *testing.T) {
 						},
 					},
 				),
-				resources.MakeK8sService(simpleRunLatest("default", "switch-configs", "blue", nil)),
+				resources.MakeK8sService(simpleRunLatest("default", "switch-configs", "blue")),
 			},
 			ExpectedPatches: Patches{
 				patchRemoveLabel("default", "blue", "serving.knative.dev/route", "v1"),
 				patchAddLabel("default", "green", "serving.knative.dev/route", "switch-configs", "v1"),
 			},
 			ExpectedUpdates: Updates{
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "switch-configs", "green", nil), "switch-configs.default.example.com"),
+				resources.MakeVirtualService2(
+					"switch-configs.default.example.com",
+					simpleRunLatest("default", "switch-configs", "green"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -1002,8 +910,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 				),
 			},
 			ExpectedStatus: v1alpha1.RouteStatus{
-				// TODO(dprotaso) 'Domain' value comes from the route test fixture
-				Domain: "switch-configs.default.example.com",
 				Conditions: duckv1alpha1.Conditions{{
 					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
 					Status: corev1.ConditionTrue,
@@ -1024,21 +930,8 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			Failures: Failures{
 				InduceFailure("patch", "configurations"),
 			},
-			Resource: simpleRunLatest("default", "rmlabel-config-failure", "green", &v1alpha1.RouteStatus{
-				Domain:         "rmlabel-config-failure.default.example.com",
-				DomainInternal: "rmlabel-config-failure.default.svc.cluster.local",
-				Conditions: duckv1alpha1.Conditions{{
-					Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-					Status: corev1.ConditionTrue,
-				}, {
-					Type:   v1alpha1.RouteConditionReady,
-					Status: corev1.ConditionTrue,
-				}},
-				Traffic: []v1alpha1.TrafficTarget{{
-					RevisionName: "blue-00001",
-					Percent:      100,
-				}},
-			}),
+			Context:  contextWithDefaultDomain("example.com"),
+			Resource: simpleRunLatest("default", "rmlabel-config-failure", "green"),
 			Objects: []runtime.Object{
 				addConfigLabel(
 					simpleReadyConfig("default", "blue"),
@@ -1054,8 +947,9 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					// Use the Revision name from the config.
 					simpleReadyConfig("default", "green").Status.LatestReadyRevisionName,
 				),
-				resources.MakeVirtualService(
-					setDomain(simpleRunLatest("default", "rmlabel-config-failure", "blue", nil), "rmlabel-config-failure.default.example.com"),
+				resources.MakeVirtualService2(
+					"rmlabel-config-failure.default.example.com",
+					simpleRunLatest("default", "rmlabel-config-failure", "blue"),
 					&traffic.TrafficConfig{
 						Targets: map[string][]traffic.RevisionTarget{
 							"": {{
@@ -1070,7 +964,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 					},
 				),
 			},
-			ExpectedStatus: NoStatusChange,
+			ExpectedStatus: v1alpha1.RouteStatus{},
 			ExpectedPatches: Patches{
 				patchRemoveLabel("default", "blue", "serving.knative.dev/route", "v1"),
 			},
@@ -1081,32 +975,16 @@ func TestVirtualServiceReconcile(t *testing.T) {
 
 // TODO(dprotaso)Review this alternate phase scenario invocation
 func TestVirtualServiceReconcile_FailureLabellingConfiguration(t *testing.T) {
-	route := simpleRunLatest("default", "addlabel-config-failure", "green", &v1alpha1.RouteStatus{
-		Domain:         "addlabel-config-failure.default.example.com",
-		DomainInternal: "addlabel-config-failure.default.svc.cluster.local",
-		Conditions: duckv1alpha1.Conditions{{
-			Type:   v1alpha1.RouteConditionAllTrafficAssigned,
-			Status: corev1.ConditionTrue,
-		}, {
-			Type:   v1alpha1.RouteConditionReady,
-			Status: corev1.ConditionTrue,
-		}},
-		Traffic: []v1alpha1.TrafficTarget{{
-			RevisionName: "blue-00001",
-			Percent:      100,
-		}},
-	})
-
-	oldRoute := setDomain(
-		simpleRunLatest("default", "addlabel-config-failure", "blue", nil),
-		"addlabel-config-failure.default.example.com",
-	)
+	oldRoute := simpleRunLatest("default", "addlabel-config-failure", "blue")
 
 	blueConfig := simpleReadyConfig("default", "blue")
 	greenConfig := simpleReadyConfig("default", "green")
+
 	blueRevision := simpleReadyRevision("default", blueConfig.Status.LatestCreatedRevisionName)
 	greenRevision := simpleReadyRevision("default", greenConfig.Status.LatestCreatedRevisionName)
-	virtualService := resources.MakeVirtualService(
+
+	virtualService := resources.MakeVirtualService2(
+		"addlabel-config-failure.default.example.com",
 		oldRoute,
 		&traffic.TrafficConfig{
 			Targets: map[string][]traffic.RevisionTarget{
@@ -1130,7 +1008,8 @@ func TestVirtualServiceReconcile_FailureLabellingConfiguration(t *testing.T) {
 		Failures: Failures{
 			InduceFailure("patch", "configurations"),
 		},
-		Resource: route,
+		Context:  contextWithDefaultDomain("example.com"),
+		Resource: simpleRunLatest("default", "addlabel-config-failure", "green"),
 		Objects: Objects{
 			blueConfig,
 			blueRevision,
@@ -1141,7 +1020,7 @@ func TestVirtualServiceReconcile_FailureLabellingConfiguration(t *testing.T) {
 		ExpectedPatches: Patches{
 			patchAddLabel("default", "green", "serving.knative.dev/route", "addlabel-config-failure", "v1"),
 		},
-		ExpectedStatus: NoStatusChange,
+		ExpectedStatus: v1alpha1.RouteStatus{},
 	}
 
 	scenario.Run(t, VSPhaseSetup, VirtualService{})
@@ -1280,11 +1159,6 @@ func simpleReadyRevision(namespace, name string) *v1alpha1.Revision {
 	}
 }
 
-func setDomain(route *v1alpha1.Route, domain string) *v1alpha1.Route {
-	route.Status.Domain = domain
-	return route
-}
-
 func addConfigLabel(config *v1alpha1.Configuration, key, value string) *v1alpha1.Configuration {
 	if config.Labels == nil {
 		config.Labels = make(map[string]string)
@@ -1299,8 +1173,8 @@ func mutateVirtualService(vs *istiov1alpha3.VirtualService) *istiov1alpha3.Virtu
 	return vs
 }
 
-func simplePinned(namespace, name, revision string, status *v1alpha1.RouteStatus) *v1alpha1.Route {
-	return routeWithTraffic(namespace, name, status, v1alpha1.TrafficTarget{
+func simplePinned(namespace, name, revision string) *v1alpha1.Route {
+	return routeWithTraffic(namespace, name, v1alpha1.TrafficTarget{
 		RevisionName: revision,
 		Percent:      100,
 	})

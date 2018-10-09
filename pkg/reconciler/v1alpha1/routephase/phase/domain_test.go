@@ -35,27 +35,11 @@ func TestDomainReconcile(t *testing.T) {
 				"example.com": {},
 			}},
 		),
-		Resource: simpleRunLatest("default", "first-reconcile", "config", nil),
+		Resource: simpleRunLatest("default", "first-reconcile", "config"),
 		ExpectedStatus: v1alpha1.RouteStatus{
 			Domain: "first-reconcile.default.example.com",
 			Targetable: &duckv1alpha1.Targetable{
 				"first-reconcile.default.svc.cluster.local",
-			},
-		},
-	}, {
-		Name: "steady-state",
-		Context: contextWithDomainConfig(&config.Domain{
-			Domains: map[string]*config.LabelSelector{
-				"example.com": {},
-			}},
-		),
-		Resource: simpleRunLatest("default", "steady-state", "config", &v1alpha1.RouteStatus{
-			Domain: "steady-state.default.example.com",
-		}),
-		ExpectedStatus: v1alpha1.RouteStatus{
-			Domain: "steady-state.default.example.com",
-			Targetable: &duckv1alpha1.Targetable{
-				"steady-state.default.svc.cluster.local",
 			},
 		},
 	}, {
@@ -65,9 +49,7 @@ func TestDomainReconcile(t *testing.T) {
 				"new-example.com": {},
 			}},
 		),
-		Resource: simpleRunLatest("default", "config-change", "config", &v1alpha1.RouteStatus{
-			Domain: "config-change.default.example.com",
-		}),
+		Resource: simpleRunLatest("default", "config-change", "config"),
 		ExpectedStatus: v1alpha1.RouteStatus{
 			Domain: "config-change.default.new-example.com",
 			Targetable: &duckv1alpha1.Targetable{
@@ -85,7 +67,7 @@ func TestDomainReconcile(t *testing.T) {
 			}},
 		),
 		Resource: addRouteLabel(
-			simpleRunLatest("default", "explicit-label", "config", nil),
+			simpleRunLatest("default", "explicit-label", "config"),
 			"app", "prod",
 		),
 		ExpectedStatus: v1alpha1.RouteStatus{
@@ -97,6 +79,14 @@ func TestDomainReconcile(t *testing.T) {
 	}}
 
 	scenarios.Run(t, PhaseSetup, Domain{})
+}
+
+func contextWithDefaultDomain(domain string) context.Context {
+	return contextWithDomainConfig(&config.Domain{
+		Domains: map[string]*config.LabelSelector{
+			domain: {},
+		}},
+	)
 }
 
 func contextWithDomainConfig(c *config.Domain) context.Context {
