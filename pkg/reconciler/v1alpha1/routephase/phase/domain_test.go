@@ -78,7 +78,7 @@ func TestDomainReconcile(t *testing.T) {
 		},
 	}}
 
-	scenarios.Run(t, PhaseSetup, Domain{})
+	scenarios.Run(t, PhaseSetup(NewDomain))
 }
 
 func contextWithDefaultDomain(domain string) context.Context {

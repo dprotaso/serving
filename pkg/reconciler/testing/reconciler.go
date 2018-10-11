@@ -22,6 +22,7 @@ import (
 
 	"github.com/knative/pkg/logging"
 	"github.com/knative/serving/pkg/reconciler"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -29,8 +30,9 @@ import (
 )
 
 type (
-	ReconcilerTests []ReconcilerTest
-	ReconcilerTest  struct {
+	ReconcilerTests       []ReconcilerTest
+	ReconcilerInitializer func(reconciler.CommonOptions, []runtime.Object) (reconciler.Reconciler, []FakeClient)
+	ReconcilerTest        struct {
 		Name    string
 		Key     string
 		Context context.Context
@@ -47,23 +49,26 @@ type (
 	}
 )
 
-func (tests ReconcilerTests) Run(t *testing.T, i Initializer, newFunc reconciler.NewFunc) {
+func (tests ReconcilerTests) Run(t *testing.T, init ReconcilerInitializer) {
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, i, newFunc)
+			test.Run(t, init)
 		})
 	}
 }
 
-func (s *ReconcilerTest) Run(t *testing.T, init Initializer, newFunc reconciler.NewFunc) {
+func (s *ReconcilerTest) Run(t *testing.T, init ReconcilerInitializer) {
 	logger := TestLogger(t)
 
-	reconciler := newFunc(reconciler.Common{
-		Logger:   logger,
-		Recorder: &record.FakeRecorder{},
-	})
+	opts := reconciler.CommonOptions{
+		Logger:        TestLogger(t),
+		Recorder:      &record.FakeRecorder{},
+		ObjectTracker: &NullTracker{},
+	}
 
-	clients := initTest(reconciler, init, s.Objects, s.Failures)
+	reconciler, fakeClients := init(opts, s.Objects)
+
+	clients := setupClientValidations(fakeClients, s.Failures)
 
 	ctx := context.TODO()
 

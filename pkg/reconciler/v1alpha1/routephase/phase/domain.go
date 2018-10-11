@@ -23,9 +23,14 @@ import (
 	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
+	reconcilerv1alpha1 "github.com/knative/serving/pkg/reconciler/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/config"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources/names"
 )
+
+func NewDomain(reconciler.CommonOptions, *reconcilerv1alpha1.DependencyFactory) *Domain {
+	return &Domain{}
+}
 
 type Domain struct{}
 

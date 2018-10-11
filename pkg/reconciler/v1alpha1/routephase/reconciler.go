@@ -25,6 +25,7 @@ import (
 	servingclientset "github.com/knative/serving/pkg/client/clientset/versioned"
 	servinglisters "github.com/knative/serving/pkg/client/listers/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
+	reconcilerv1alpha1 "github.com/knative/serving/pkg/reconciler/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/config"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/routephase/phase"
 	"go.uber.org/zap"
@@ -40,7 +41,7 @@ type RoutePhase interface {
 }
 
 type Reconciler struct {
-	reconciler.Common
+	reconciler.CommonOptions
 
 	RouteLister      servinglisters.RouteLister
 	ServingClientset servingclientset.Interface
@@ -49,16 +50,20 @@ type Reconciler struct {
 	RoutePhases []RoutePhase
 }
 
-func NewPrototype(opts reconciler.Common) reconciler.Reconciler {
+func New(opts reconciler.CommonOptions, deps *reconcilerv1alpha1.DependencyFactory) reconciler.Reconciler {
 	cfgLogger := opts.Logger.Named("config-store")
 
 	return &Reconciler{
-		Common:  opts,
+		CommonOptions: opts,
+
+		RouteLister:      deps.Serving.InformerFactory.Serving().V1alpha1().Routes().Lister(),
+		ServingClientset: deps.Serving.Client,
+
 		Configs: config.NewStore(cfgLogger),
 		RoutePhases: []RoutePhase{
-			&phase.K8sService{},
-			&phase.Domain{},
-			&phase.VirtualService{},
+			phase.NewDomain(opts, deps),
+			phase.NewK8sService(opts, deps),
+			phase.NewVirtualService(opts, deps),
 		},
 	}
 }
@@ -166,12 +171,4 @@ func (r *Reconciler) updateStatus(ctx context.Context, route *v1alpha1.Route) (*
 
 	r.Recorder.Eventf(route, corev1.EventTypeNormal, "Updated", "Updated status for route %q", route.Name)
 	return updated, nil
-}
-
-func (r *Reconciler) InjectServingClient(c servingclientset.Interface) {
-	r.ServingClientset = c
-}
-
-func (r *Reconciler) InjectRouteLister(l servinglisters.RouteLister) {
-	r.RouteLister = l
 }

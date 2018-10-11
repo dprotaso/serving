@@ -124,7 +124,7 @@ func TestServiceReconcile(t *testing.T) {
 		},
 	}
 
-	scenarios.Run(t, PhaseSetup, K8sService{})
+	scenarios.Run(t, PhaseSetup(NewK8sService))
 }
 
 func mutateService(svc *corev1.Service) *corev1.Service {
