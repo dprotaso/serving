@@ -25,9 +25,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/knative/pkg/logging"
+	"github.com/knative/serving/pkg/reconciler"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 
 	. "github.com/knative/pkg/logging/testing"
 )
@@ -48,8 +50,8 @@ type (
 	// so the test can assert on create, update and patch actions.
 	// PhaseScenario will also prepend validation and failure reactors
 	// These failure reactors can be set on the PhaseScenario's Failures
-	// property
-	Initializer func(phase interface{}, objs []runtime.Object) []FakeClient
+	// propert
+	PhaseInitializer func(reconciler.CommonOptions, []runtime.Object) (interface{}, []FakeClient)
 
 	// Resource defines the Kubernetes Resource being reconciled
 	Resource interface {
@@ -91,17 +93,10 @@ type (
 //
 // The Kubernetes resource in the phase's reconcile method should match
 // the PhaseScenario's resource type
-func (tests PhaseTests) Run(t *testing.T, i Initializer, prototype interface{}) {
-	phaseType := reflect.TypeOf(prototype)
-
-	if phaseType.Kind() == reflect.Ptr {
-		t.Fatalf("pass the non-pointer type %q as the prototype to Run",
-			phaseType.Elem())
-	}
-
+func (tests PhaseTests) Run(t *testing.T, initializer PhaseInitializer) {
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, i, prototype)
+			test.Run(t, initializer)
 		})
 	}
 }
@@ -113,16 +108,17 @@ func (tests PhaseTests) Run(t *testing.T, i Initializer, prototype interface{}) 
 //
 // The Kubernetes resource in the phase's reconcile method should match
 // the PhaseScenario's resource type
-func (s *PhaseTest) Run(
-	t *testing.T,
-	init Initializer,
-	prototype interface{},
-) {
-	s.ensurePhaseType(t, prototype)
+func (s *PhaseTest) Run(t *testing.T, initPhase PhaseInitializer) {
+	opts := reconciler.CommonOptions{
+		Logger:        TestLogger(t),
+		Recorder:      &record.FakeRecorder{},
+		ObjectTracker: &NullTracker{},
+	}
 
-	phase := reflect.New(reflect.TypeOf(prototype)).Interface()
+	phase, fakeClients := initPhase(opts, s.Objects)
 
-	clients := initTest(phase, init, s.Objects, s.Failures)
+	clients := setupClientValidations(fakeClients, s.Failures)
+	s.ensurePhaseType(t, phase)
 
 	status, err := s.invokeReconcile(t, phase)
 
@@ -178,15 +174,12 @@ func (s *PhaseTest) invokeReconcile(t *testing.T, phase interface{}) (interface{
 	return output[0].Interface(), err
 }
 
-func (s *PhaseTest) ensurePhaseType(t *testing.T, prototype interface{}) {
-	phaseType := reflect.TypeOf(prototype)
+func (s *PhaseTest) ensurePhaseType(t *testing.T, phase interface{}) {
+	phaseType := reflect.TypeOf(phase)
 
-	if phaseType.Kind() == reflect.Ptr {
-		t.Fatalf("pass the non-pointer type %q as the phase to Run", phaseType.Elem())
+	if phaseType.Kind() != reflect.Ptr {
+		t.Fatalf("expected the constructed phase to be a pointer type %q", phaseType)
 	}
-
-	// Expect reconcile on pointer receiver
-	phaseType = reflect.PtrTo(phaseType)
 
 	resourceType := reflect.TypeOf(s.Resource)
 	statusField, ok := resourceType.Elem().FieldByName("Status")
@@ -335,15 +328,8 @@ func assertPatches(
 	}
 }
 
-func initTest(
-	obj interface{},
-	init Initializer,
-	objs []runtime.Object,
-	failures Failures,
-) ActionRecorderList {
+func setupClientValidations(clients []FakeClient, failures Failures) ActionRecorderList {
 	var recorders ActionRecorderList
-
-	clients := init(obj, objs)
 
 	for _, client := range clients {
 		recorders = append(recorders, client)

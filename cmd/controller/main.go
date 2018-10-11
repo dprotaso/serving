@@ -74,21 +74,22 @@ func main() {
 	}
 
 	resync := 10 * time.Hour // Based on controller-runtime default.
+	trackerLease := 3 * resync
 
-	initializer, err := v1alpha1reconciler.NewInitializer(cfg, logger, v1alpha1reconciler.Resync(resync))
+	deps, err := v1alpha1reconciler.NewDependencyFactory(cfg, resync)
 
 	if err != nil {
 		logger.Fatalf("Error initializing: %v", err)
 	}
 
-	configMapWatcher := configmap.NewInformedWatcher(initializer.Kubernetes.Client, system.Namespace)
+	configMapWatcher := configmap.NewInformedWatcher(deps.Kubernetes.Client, system.Namespace)
 
 	opt := reconciler.Options{
-		KubeClientSet:    initializer.Kubernetes.Client,
-		SharedClientSet:  initializer.Shared.Client,
-		ServingClientSet: initializer.Serving.Client,
-		CachingClientSet: initializer.Caching.Client,
-		DynamicClientSet: initializer.Dynamic.Client,
+		KubeClientSet:    deps.Kubernetes.Client,
+		SharedClientSet:  deps.Shared.Client,
+		ServingClientSet: deps.Serving.Client,
+		CachingClientSet: deps.Caching.Client,
+		DynamicClientSet: deps.Dynamic.Client,
 		ConfigMapWatcher: configMapWatcher,
 		Logger:           logger,
 		ResyncPeriod:     resync,
@@ -97,23 +98,26 @@ func main() {
 
 	buildInformerFactory := revision.KResourceTypedInformerFactory(opt)
 
-	serviceInformer := initializer.Serving.InformerFactory.Serving().V1alpha1().Services()
-	routeInformer := initializer.Serving.InformerFactory.Serving().V1alpha1().Routes()
-	configurationInformer := initializer.Serving.InformerFactory.Serving().V1alpha1().Configurations()
-	revisionInformer := initializer.Serving.InformerFactory.Serving().V1alpha1().Revisions()
-	kpaInformer := initializer.Serving.InformerFactory.Autoscaling().V1alpha1().PodAutoscalers()
+	serviceInformer := deps.Serving.InformerFactory.Serving().V1alpha1().Services()
+	routeInformer := deps.Serving.InformerFactory.Serving().V1alpha1().Routes()
+	configurationInformer := deps.Serving.InformerFactory.Serving().V1alpha1().Configurations()
+	revisionInformer := deps.Serving.InformerFactory.Serving().V1alpha1().Revisions()
+	kpaInformer := deps.Serving.InformerFactory.Autoscaling().V1alpha1().PodAutoscalers()
 
-	deploymentInformer := initializer.Kubernetes.InformerFactory.Apps().V1().Deployments()
-	coreServiceInformer := initializer.Kubernetes.InformerFactory.Core().V1().Services()
-	endpointsInformer := initializer.Kubernetes.InformerFactory.Core().V1().Endpoints()
-	configMapInformer := initializer.Kubernetes.InformerFactory.Core().V1().ConfigMaps()
-	imageInformer := initializer.Caching.InformerFactory.Caching().V1alpha1().Images()
+	deploymentInformer := deps.Kubernetes.InformerFactory.Apps().V1().Deployments()
+	coreServiceInformer := deps.Kubernetes.InformerFactory.Core().V1().Services()
+	endpointsInformer := deps.Kubernetes.InformerFactory.Core().V1().Endpoints()
+	configMapInformer := deps.Kubernetes.InformerFactory.Core().V1().ConfigMaps()
+	imageInformer := deps.Caching.InformerFactory.Caching().V1alpha1().Images()
 
-	routeController, err := initializer.NewController(
-		routephase.NewPrototype,
+	routeController, err := v1alpha1reconciler.NewController(
+		logger,
+		routephase.New,
 		"route-controller",
 		"Routes",
 		configMapWatcher,
+		deps,
+		trackerLease,
 	)
 
 	if err != nil {
@@ -158,7 +162,7 @@ func main() {
 	configMapWatcher.Watch(logging.ConfigName, logging.UpdateLevelFromConfigMap(logger, atomicLevel, logLevelKey))
 
 	// These are non-blocking.
-	initializer.Start(stopCh)
+	deps.StartInformers(stopCh)
 
 	if err := configMapWatcher.Start(stopCh); err != nil {
 		logger.Fatalf("failed to start configuration manager: %v", err)
@@ -166,7 +170,7 @@ func main() {
 
 	// Wait for the caches to be synced before starting controllers.
 	logger.Info("Waiting for informer caches to sync")
-	if err := initializer.WaitForCacheSync(stopCh); err != nil {
+	if err := deps.WaitForInformerCacheSync(stopCh); err != nil {
 		logger.Fatalf(err.Error())
 	}
 

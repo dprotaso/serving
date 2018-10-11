@@ -23,6 +23,7 @@ import (
 	"github.com/knative/pkg/logging"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
+	reconcilerv1alpha1 "github.com/knative/serving/pkg/reconciler/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources/names"
 	"go.uber.org/zap"
@@ -33,6 +34,14 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 )
+
+func NewK8sService(o reconciler.CommonOptions, d *reconcilerv1alpha1.DependencyFactory) *K8sService {
+	return &K8sService{
+		ServiceLister: d.Kubernetes.InformerFactory.Core().V1().Services().Lister(),
+		KubeClientSet: d.Kubernetes.Client,
+		Recorder:      o.Recorder,
+	}
+}
 
 type K8sService struct {
 	ServiceLister corev1listers.ServiceLister
@@ -118,16 +127,4 @@ func (p *K8sService) update(logger *zap.SugaredLogger, route *v1alpha1.Route, se
 	}
 
 	return err
-}
-
-func (p *K8sService) InjectServiceLister(l corev1listers.ServiceLister) {
-	p.ServiceLister = l
-}
-
-func (p *K8sService) InjectKubeClientset(k kubernetes.Interface) {
-	p.KubeClientSet = k
-}
-
-func (p *K8sService) InjectEventRecorder(r record.EventRecorder) {
-	p.Recorder = r
 }

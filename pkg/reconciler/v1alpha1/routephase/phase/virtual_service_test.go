@@ -807,7 +807,7 @@ func TestVirtualServiceReconcile(t *testing.T) {
 			},
 		}}
 
-	scenarios.Run(t, VSPhaseSetup, VirtualService{})
+	scenarios.Run(t, PhaseSetup(NewVirtualService))
 }
 
 // TODO(dprotaso)Review this alternate phase scenario invocation
@@ -862,12 +862,6 @@ func TestVirtualServiceReconcile(t *testing.T) {
 //
 //	scenario.Run(t, VSPhaseSetup, VirtualService{})
 //}
-
-func VSPhaseSetup(obj interface{}, objs []runtime.Object) []FakeClient {
-	vs := obj.(*VirtualService)
-	vs.Tracker = &NullTracker{}
-	return PhaseSetup(obj, objs)
-}
 
 func patchRemoveLabel(namespace, name, key, version string) clientgotesting.PatchActionImpl {
 	action := clientgotesting.PatchActionImpl{}

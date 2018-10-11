@@ -30,6 +30,7 @@ import (
 	servingclientset "github.com/knative/serving/pkg/client/clientset/versioned"
 	servinglisters "github.com/knative/serving/pkg/client/listers/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
+	reconcilerv1alpha1 "github.com/knative/serving/pkg/reconciler/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/traffic"
 	"go.uber.org/zap"
@@ -38,6 +39,19 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 )
+
+func NewVirtualService(o reconciler.CommonOptions, d *reconcilerv1alpha1.DependencyFactory) *VirtualService {
+	return &VirtualService{
+		ConfigurationLister:  d.Serving.InformerFactory.Serving().V1alpha1().Configurations().Lister(),
+		RevisionLister:       d.Serving.InformerFactory.Serving().V1alpha1().Revisions().Lister(),
+		VirtualServiceLister: d.Shared.InformerFactory.Networking().V1alpha3().VirtualServices().Lister(),
+
+		ServingClient: d.Serving.Client,
+		SharedClient:  d.Shared.Client,
+		Recorder:      o.Recorder,
+		Tracker:       o.ObjectTracker,
+	}
+}
 
 type VirtualService struct {
 	ConfigurationLister  servinglisters.ConfigurationLister
@@ -154,34 +168,6 @@ func (p *VirtualService) reconcileService(
 	// TODO(mattmoor): This is where we'd look at the state of the VirtualService and
 	// reflect any necessary state into the Route.
 	return err
-}
-
-func (p *VirtualService) InjectConfigurationLister(l servinglisters.ConfigurationLister) {
-	p.ConfigurationLister = l
-}
-
-func (p *VirtualService) InjectRevisionLister(l servinglisters.RevisionLister) {
-	p.RevisionLister = l
-}
-
-func (p *VirtualService) InjectVirtualServiceLister(l istiolisters.VirtualServiceLister) {
-	p.VirtualServiceLister = l
-}
-
-func (p *VirtualService) InjectServingClient(c servingclientset.Interface) {
-	p.ServingClient = c
-}
-
-func (p *VirtualService) InjectSharedClient(c sharedclientset.Interface) {
-	p.SharedClient = c
-}
-
-func (p *VirtualService) InjectEventRecorder(r record.EventRecorder) {
-	p.Recorder = r
-}
-
-func (p *VirtualService) InjectObjectTracker(t tracker.Interface) {
-	p.Tracker = t
 }
 
 type accessor interface {

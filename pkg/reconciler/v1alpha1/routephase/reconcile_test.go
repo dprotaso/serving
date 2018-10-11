@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 
+	reconcilerv1alpha1 "github.com/knative/serving/pkg/reconciler/v1alpha1"
 	. "github.com/knative/serving/pkg/reconciler/v1alpha1/testing"
 )
 
@@ -94,7 +95,7 @@ func TestRouteReconcile(t *testing.T) {
 		},
 	}}
 
-	scenarios.Run(t, ReconcilerSetup, newTestPrototype)
+	scenarios.Run(t, ReconcilerSetup(reconcilerWithNoPhases))
 }
 
 func TestRouteReconcile_DelegatesToPhases(t *testing.T) {
@@ -127,25 +128,29 @@ func TestRouteReconcile_DelegatesToPhases(t *testing.T) {
 	}
 }
 
-func newTestPrototype(c reconciler.Common) reconciler.Reconciler {
-	return &Reconciler{
-		Common:  c,
-		Configs: noopStore{},
-	}
+func reconcilerWithNoPhases(
+	opts reconciler.CommonOptions,
+	deps *reconcilerv1alpha1.DependencyFactory,
+) reconciler.Reconciler {
+
+	reconciler := New(opts, deps).(*Reconciler)
+	reconciler.Configs = noopStore{}
+	reconciler.RoutePhases = nil
+	return reconciler
 }
 
 func testReconciler(t *testing.T, objs ...runtime.Object) *Reconciler {
-	r := &Reconciler{
-		Configs: noopStore{},
-		Common: reconciler.Common{
-			Logger:   TestLogger(t),
-			Recorder: &record.FakeRecorder{},
-		},
+	opts := reconciler.CommonOptions{
+		Logger:        TestLogger(t),
+		Recorder:      &record.FakeRecorder{},
+		ObjectTracker: &NullTracker{},
 	}
 
-	ReconcilerSetup(r, objs)
-
-	return r
+	deps := NewFakeDependencies(objs)
+	reconciler := New(opts, deps).(*Reconciler)
+	reconciler.Configs = noopStore{}
+	reconciler.RoutePhases = nil
+	return reconciler
 }
 
 type mockPhase struct {
