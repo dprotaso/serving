@@ -52,7 +52,7 @@ func NewController(
 	trackerLease time.Duration,
 ) (*controller.Impl, error) {
 
-	// There's a circular construction problem between
+	// There's a circular dependency between
 	// the reconciler and the host controller
 	//
 	// controller -> reconciler -> tracker -> controller
