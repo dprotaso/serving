@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/knative/pkg/configmap"
@@ -30,7 +29,6 @@ import (
 	"go.uber.org/zap"
 	kubeapicorev1 "k8s.io/api/core/v1"
 	kubetypedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -66,75 +64,31 @@ func NewController(
 	recorder := newRecorder(componentName, logger, deps)
 	tracker := tracker.New(c.EnqueueKey, trackerLease)
 
-	reconciler := newFunc(reconciler.CommonOptions{
+	rec := newFunc(reconciler.CommonOptions{
 		Logger:        logger,
 		Recorder:      recorder,
 		ObjectTracker: tracker,
 	}, deps)
 
-	if err := setupTriggers(c, tracker, reconciler.Triggers(), deps); err != nil {
+	if err := reconciler.SetupTriggers(rec, c, tracker, deps); err != nil {
 		return nil, err
 	}
 
-	for _, phase := range reconciler.Phases() {
-		if err := setupTriggers(c, tracker, phase.Triggers(), deps); err != nil {
-			return nil, err
-		}
-	}
-
-	if reconciler.ConfigStore() != nil {
-		reconciler.ConfigStore().WatchConfigs(watcher)
-	}
-
-	c.Reconciler = reconciler
-
-	return c, nil
-}
-
-func setupTriggers(
-	c *controller.Impl,
-	tracker tracker.Interface,
-	triggers []reconciler.Trigger,
-	deps *DependencyFactory,
-) error {
-
-	for _, trigger := range triggers {
-		informer, err := deps.InformerFor(trigger.ObjectKind)
-		if err != nil {
-			return err
-		}
-
-		var enqueue func(obj interface{})
-
-		switch trigger.EnqueueType {
-		case reconciler.EnqueueObject:
-			enqueue = c.Enqueue
-			break
-		case reconciler.EnqueueOwner:
-			enqueue = c.EnqueueControllerOf
-		case reconciler.EnqueueTracker:
-			enqueue = tracker.OnChanged
-		default:
-			return fmt.Errorf("Unknown trigger enqueue type %q", trigger.EnqueueType)
-		}
-
-		var handler cache.ResourceEventHandler = cache.ResourceEventHandlerFuncs{
-			AddFunc:    enqueue,
-			UpdateFunc: controller.PassNew(enqueue),
-			DeleteFunc: enqueue,
-		}
-
-		if !trigger.OwnerKind.Empty() {
-			handler = cache.FilteringResourceEventHandler{
-				FilterFunc: controller.Filter(trigger.OwnerKind),
-				Handler:    handler,
+	if phasedRec, ok := rec.(reconciler.WithPhases); ok {
+		for _, phase := range phasedRec.Phases() {
+			if err := reconciler.SetupTriggers(phase, c, tracker, deps); err != nil {
+				return nil, err
 			}
 		}
-
-		informer.AddEventHandler(handler)
 	}
 
-	return nil
+	if configRec, ok := rec.(reconciler.WithConfigStore); ok {
+		configRec.ConfigStore().WatchConfigs(watcher)
+	}
+
+	c.Reconciler = rec
+
+	return c, nil
 }
 
 func newRecorder(

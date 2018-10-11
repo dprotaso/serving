@@ -34,10 +34,6 @@ func NewDomain(reconciler.CommonOptions, *reconcilerv1alpha1.DependencyFactory) 
 
 type Domain struct{}
 
-func (p *Domain) Triggers() []reconciler.Trigger {
-	return nil
-}
-
 func (p *Domain) Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error) {
 	return v1alpha1.RouteStatus{
 		Domain: routeDomain(ctx, route),
