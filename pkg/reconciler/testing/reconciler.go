@@ -30,9 +30,19 @@ import (
 )
 
 type (
-	ReconcilerTests       []ReconcilerTest
-	ReconcilerInitializer func(reconciler.CommonOptions, []runtime.Object) (reconciler.Reconciler, []FakeClient)
-	ReconcilerTest        struct {
+	// ReconcilerSetupFunc is responsible for creating a reconciler and setting up
+	// any various clients and informers with the given runtime objects.
+	//
+	// The function should return the list of fake clientsets
+	// so the test can assert on create, update and patch actions.
+	//
+	// ReconcilerTest will also prepend validation and failure reactors.
+	// These failure reactors can be set on the ReconcilerTest's Failures
+	// property
+	ReconcilerSetupFunc func(reconciler.CommonOptions, []runtime.Object) (reconciler.Reconciler, []FakeClient)
+
+	ReconcilerTests []ReconcilerTest
+	ReconcilerTest  struct {
 		Name    string
 		Key     string
 		Context context.Context
@@ -49,15 +59,15 @@ type (
 	}
 )
 
-func (tests ReconcilerTests) Run(t *testing.T, init ReconcilerInitializer) {
+func (tests ReconcilerTests) Run(t *testing.T, setup ReconcilerSetupFunc) {
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, init)
+			test.Run(t, setup)
 		})
 	}
 }
 
-func (s *ReconcilerTest) Run(t *testing.T, init ReconcilerInitializer) {
+func (s *ReconcilerTest) Run(t *testing.T, setup ReconcilerSetupFunc) {
 	logger := TestLogger(t)
 
 	opts := reconciler.CommonOptions{
@@ -66,7 +76,7 @@ func (s *ReconcilerTest) Run(t *testing.T, init ReconcilerInitializer) {
 		ObjectTracker: &NullTracker{},
 	}
 
-	reconciler, fakeClients := init(opts, s.Objects)
+	reconciler, fakeClients := setup(opts, s.Objects)
 
 	clients := setupClientValidations(fakeClients, s.Failures)
 

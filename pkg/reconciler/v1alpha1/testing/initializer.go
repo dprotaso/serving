@@ -37,7 +37,7 @@ import (
 
 type newReconcilerFunc func(reconciler.CommonOptions, *v1alpha1.DependencyFactory) reconciler.Reconciler
 
-func ReconcilerSetup(newReconciler newReconcilerFunc) testing.ReconcilerInitializer {
+func ReconcilerSetup(newReconciler newReconcilerFunc) testing.ReconcilerSetupFunc {
 	return func(opts reconciler.CommonOptions, objs []runtime.Object) (reconciler.Reconciler, []FakeClient) {
 		deps := NewFakeDependencies(objs)
 		reconciler := newReconciler(opts, deps)
@@ -45,7 +45,7 @@ func ReconcilerSetup(newReconciler newReconcilerFunc) testing.ReconcilerInitiali
 	}
 }
 
-func PhaseSetup(newPhase interface{}) testing.PhaseInitializer {
+func PhaseSetup(newPhase interface{}) testing.PhaseSetupFunc {
 	return func(opts reconciler.CommonOptions, objs []runtime.Object) (interface{}, []FakeClient) {
 		deps := NewFakeDependencies(objs)
 

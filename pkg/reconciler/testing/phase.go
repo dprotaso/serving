@@ -35,6 +35,7 @@ import (
 )
 
 type (
+	// We add these aliases for better readability
 	Failures   []clientgotesting.ReactionFunc
 	Creates    []runtime.Object
 	Updates    []runtime.Object
@@ -42,28 +43,31 @@ type (
 	Objects    []runtime.Object
 	PhaseTests []PhaseTest
 
-	// PhaseInitializer is responsible for initializing a phase struct.
-	// This typically involves injecting various fake cliensets, listers etc.
-	// into the phase object.
+	// PhaseSetupFunc is responsible for creating a phase and setting up
+	// any various clients and informers with the given runtime objects.
 	//
-	// The initializer should return the list of fake clientsets
+	// The function should return the list of fake clientsets
 	// so the test can assert on create, update and patch actions.
-	// PhaseScenario will also prepend validation and failure reactors
-	// These failure reactors can be set on the PhaseScenario's Failures
-	// propert
-	PhaseInitializer func(reconciler.CommonOptions, []runtime.Object) (interface{}, []FakeClient)
+	//
+	// PhaseTests will also prepend validation and failure reactors.
+	// These failure reactors can be set on the PhaseTests's Failures
+	// property
+	PhaseSetupFunc func(reconciler.CommonOptions, []runtime.Object) (interface{}, []FakeClient)
 
-	// Resource defines the Kubernetes Resource being reconciled
+	// Resource defines the Kubernetes resource being reconciled
 	Resource interface {
 		runtime.Object
 		metav1.Object
 	}
 
+	// FakeClient is used to capture creates, updates, deletes as well as
+	// inducing failures
 	FakeClient interface {
 		ActionRecorder
 		PrependReactor(verb, resource string, reaction clientgotesting.ReactionFunc)
 	}
 
+	// PhaseTest is used to test a single invocation of a phase's reconcilation
 	PhaseTest struct {
 		Name string
 
@@ -81,41 +85,35 @@ type (
 
 		// ExpectStatus should be a non-pointer struct that should be
 		// compared to the reconciled resource's status
-		//
-		// If the value is set to NoStatusChange the test will assert
-		// that there have been no changes to the resource's status
 		ExpectedStatus interface{}
 	}
 )
 
-// Run will iterate over each PhaseScenario and invoke them as a subtest
-// The prototype should be a non-pointer, un-initialized phase struct.
+// Run will iterate over each PhaseTests and invoke them as a subtest
 //
 // The Kubernetes resource in the phase's reconcile method should match
-// the PhaseScenario's resource type
-func (tests PhaseTests) Run(t *testing.T, initializer PhaseInitializer) {
+// the PhaseTest's resource type
+func (tests PhaseTests) Run(t *testing.T, setup PhaseSetupFunc) {
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, initializer)
+			test.Run(t, setup)
 		})
 	}
 }
 
-// Run will setup the PhaseScenario, trigger a reconcile and perform
+// Run will setup the PhaseTest, trigger a reconcile and perform
 // the necessary test assertions.
 //
-// The prototype should be a non-pointer, un-initialized phase struct.
-//
 // The Kubernetes resource in the phase's reconcile method should match
-// the PhaseScenario's resource type
-func (s *PhaseTest) Run(t *testing.T, initPhase PhaseInitializer) {
+// the PhaseTest's resource type
+func (s *PhaseTest) Run(t *testing.T, setup PhaseSetupFunc) {
 	opts := reconciler.CommonOptions{
 		Logger:        TestLogger(t),
 		Recorder:      &record.FakeRecorder{},
 		ObjectTracker: &NullTracker{},
 	}
 
-	phase, fakeClients := initPhase(opts, s.Objects)
+	phase, fakeClients := setup(opts, s.Objects)
 
 	clients := setupClientValidations(fakeClients, s.Failures)
 	s.ensurePhaseType(t, phase)
