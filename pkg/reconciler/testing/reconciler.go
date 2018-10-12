@@ -76,9 +76,11 @@ func (s *ReconcilerTest) Run(t *testing.T, setup ReconcilerSetupFunc) {
 	logger := TestLogger(t)
 
 	opts := reconciler.CommonOptions{
-		Logger:        TestLogger(t),
-		Recorder:      &record.FakeRecorder{},
-		ObjectTracker: &NullTracker{},
+		Logger:           TestLogger(t),
+		Recorder:         &record.FakeRecorder{},
+		ObjectTracker:    &NullTracker{},
+		ConfigMapWatcher: &FakeConfigMapWatcher{},
+		WorkQueue:        &FakeWorkQueue{},
 	}
 
 	reconciler, fakeClients := setup(opts, s.Objects)

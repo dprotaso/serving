@@ -61,15 +61,6 @@ type (
 		Phases() []Phase
 	}
 
-	// WithConfigStore is an interface a reconciler may conform to
-	// in order to surface the reconciler's config store
-	//
-	// The motivation to expose a reconciler's config store is to setup
-	// watching the necessary config maps and translate them to go structs
-	WithConfigStore interface {
-		ConfigStore() ConfigStore
-	}
-
 	// ConfigStore is responsbile for storing it's configuration into context
 	// Subsequently it instructs the configmap.Watcher to watch certain configs
 	// a reconciler may be interested in.
@@ -78,11 +69,21 @@ type (
 		WatchConfigs(configmap.Watcher)
 	}
 
+	// WorkQueue is a consumer interface which exposes the underlying work queue
+	// to the reconciler
+	WorkQueue interface {
+		EnqueueKey(key string)
+		Enqueue(obj interface{})
+		EnqueueControllerOf(obj interface{})
+	}
+
 	// CommonOptions contains the dependencies that are associated with a specific
 	// instance of a reconciler
 	CommonOptions struct {
-		Logger        *zap.SugaredLogger
-		Recorder      record.EventRecorder
-		ObjectTracker tracker.Interface
+		Logger           *zap.SugaredLogger
+		Recorder         record.EventRecorder
+		ObjectTracker    tracker.Interface
+		WorkQueue        WorkQueue
+		ConfigMapWatcher configmap.Watcher
 	}
 )

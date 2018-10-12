@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
-	"github.com/knative/pkg/configmap"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
 	corev1 "k8s.io/api/core/v1"
@@ -134,21 +133,23 @@ func reconcilerWithNoPhases(
 ) reconciler.Reconciler {
 
 	reconciler := New(opts, deps).(*Reconciler)
-	reconciler.Configs = noopStore{}
+	reconciler.Configs = &FakeConfigStore{}
 	reconciler.RoutePhases = nil
 	return reconciler
 }
 
 func testReconciler(t *testing.T, objs ...runtime.Object) *Reconciler {
 	opts := reconciler.CommonOptions{
-		Logger:        TestLogger(t),
-		Recorder:      &record.FakeRecorder{},
-		ObjectTracker: &NullTracker{},
+		Logger:           TestLogger(t),
+		Recorder:         &record.FakeRecorder{},
+		ObjectTracker:    &NullTracker{},
+		ConfigMapWatcher: &FakeConfigMapWatcher{},
+		WorkQueue:        &FakeWorkQueue{},
 	}
 
 	deps := NewFakeDependencies(objs)
 	reconciler := New(opts, deps).(*Reconciler)
-	reconciler.Configs = noopStore{}
+	reconciler.Configs = &FakeConfigStore{}
 	reconciler.RoutePhases = nil
 	return reconciler
 }
@@ -196,12 +197,3 @@ func routeWithTraffic(namespace, name string, status *v1alpha1.RouteStatus, traf
 	}
 	return route
 }
-
-type noopStore struct {
-}
-
-func (s noopStore) ToContext(ctx context.Context) context.Context {
-	return ctx
-}
-
-func (s noopStore) WatchConfigs(w configmap.Watcher) {}

@@ -318,8 +318,12 @@ func (f *invocationRecorder) resetInvocations() {
 
 func (f *invocationRecorder) Enqueue(obj interface{}) {
 	f.enqueueInvoked = true
-
 }
+
+func (f *invocationRecorder) EnqueueKey(key string) {
+	panic("EnqueueKey should not be invoked")
+}
+
 func (f *invocationRecorder) EnqueueControllerOf(obj interface{}) {
 	f.enqueueControllerOfInvoked = true
 }

@@ -108,9 +108,11 @@ func (tests PhaseTests) Run(t *testing.T, setup PhaseSetupFunc) {
 // the PhaseTest's resource type
 func (s *PhaseTest) Run(t *testing.T, setup PhaseSetupFunc) {
 	opts := reconciler.CommonOptions{
-		Logger:        TestLogger(t),
-		Recorder:      &record.FakeRecorder{},
-		ObjectTracker: &NullTracker{},
+		Logger:           TestLogger(t),
+		Recorder:         &record.FakeRecorder{},
+		ObjectTracker:    &NullTracker{},
+		ConfigMapWatcher: &FakeConfigMapWatcher{},
+		WorkQueue:        &FakeWorkQueue{},
 	}
 
 	phase, fakeClients := setup(opts, s.Objects)

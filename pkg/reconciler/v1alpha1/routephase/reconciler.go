@@ -51,7 +51,8 @@ type Reconciler struct {
 }
 
 func New(opts reconciler.CommonOptions, deps *reconcilerv1alpha1.DependencyFactory) reconciler.Reconciler {
-	cfgLogger := opts.Logger.Named("config-store")
+	store := config.NewStore(opts.Logger.Named("config-store"))
+	store.WatchConfigs(opts.ConfigMapWatcher)
 
 	return &Reconciler{
 		CommonOptions: opts,
@@ -59,13 +60,14 @@ func New(opts reconciler.CommonOptions, deps *reconcilerv1alpha1.DependencyFacto
 		RouteLister:      deps.Serving.InformerFactory.Serving().V1alpha1().Routes().Lister(),
 		ServingClientset: deps.Serving.Client,
 
-		Configs: config.NewStore(cfgLogger),
+		Configs: store,
 		RoutePhases: []RoutePhase{
 			phase.NewDomain(opts, deps),
 			phase.NewK8sService(opts, deps),
 			phase.NewVirtualService(opts, deps),
 		},
 	}
+
 }
 
 func (r *Reconciler) ConfigStore() reconciler.ConfigStore {

@@ -39,6 +39,10 @@ type (
 	Updates            = testing.Updates
 	FakeClient         = testing.FakeClient
 	NullTracker        = testing.NullTracker
+
+	FakeConfigMapWatcher = testing.FakeConfigMapWatcher
+	FakeConfigStore      = testing.FakeConfigStore
+	FakeWorkQueue        = testing.FakeWorkQueue
 )
 
 var (

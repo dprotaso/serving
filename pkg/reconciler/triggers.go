@@ -80,19 +80,13 @@ type (
 	objectTracker interface {
 		OnChanged(obj interface{})
 	}
-
-	// controller is a consumer interface type for SetupTriggers
-	queue interface {
-		Enqueue(obj interface{})
-		EnqueueControllerOf(obj interface{})
-	}
 )
 
 // SetupTriggers will setup the correct informers and callbacks if the
 // provided object conforms to WithTriggers interface.
 //
 // It returns no error if the object does not conform to the WithTriggers interface.
-func SetupTriggers(obj interface{}, queue queue, tracker objectTracker, factory informerFactory) error {
+func SetupTriggers(obj interface{}, queue WorkQueue, tracker objectTracker, factory informerFactory) error {
 	holder, ok := obj.(WithTriggers)
 
 	if !ok {

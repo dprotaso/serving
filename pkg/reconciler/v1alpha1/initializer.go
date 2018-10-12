@@ -65,9 +65,11 @@ func NewController(
 	tracker := tracker.New(c.EnqueueKey, trackerLease)
 
 	rec := newFunc(reconciler.CommonOptions{
-		Logger:        logger,
-		Recorder:      recorder,
-		ObjectTracker: tracker,
+		Logger:           logger,
+		Recorder:         recorder,
+		ObjectTracker:    tracker,
+		WorkQueue:        c,
+		ConfigMapWatcher: watcher,
 	}, deps)
 
 	if err := reconciler.SetupTriggers(rec, c, tracker, deps); err != nil {
@@ -80,10 +82,6 @@ func NewController(
 				return nil, err
 			}
 		}
-	}
-
-	if configRec, ok := rec.(reconciler.WithConfigStore); ok {
-		configRec.ConfigStore().WatchConfigs(watcher)
 	}
 
 	c.Reconciler = rec
