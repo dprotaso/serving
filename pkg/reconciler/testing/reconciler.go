@@ -42,7 +42,9 @@ type (
 	ReconcilerSetupFunc func(reconciler.CommonOptions, []runtime.Object) (reconciler.Reconciler, []FakeClient)
 
 	ReconcilerTests []ReconcilerTest
-	ReconcilerTest  struct {
+
+	// ReconcilerTest is used to test a single reconciler reconciliation.
+	ReconcilerTest struct {
 		Name    string
 		Key     string
 		Context context.Context
@@ -59,6 +61,7 @@ type (
 	}
 )
 
+// Run will iterate over each ReconcilerTest and invoke them as a subtest.
 func (tests ReconcilerTests) Run(t *testing.T, setup ReconcilerSetupFunc) {
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
@@ -67,6 +70,8 @@ func (tests ReconcilerTests) Run(t *testing.T, setup ReconcilerSetupFunc) {
 	}
 }
 
+// Run will setup the ReconcilerTest, trigger a reconcile and perform
+// the necessary test assertions.
 func (s *ReconcilerTest) Run(t *testing.T, setup ReconcilerSetupFunc) {
 	logger := TestLogger(t)
 
