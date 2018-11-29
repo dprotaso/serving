@@ -19,7 +19,6 @@ package phase
 import (
 	"testing"
 
-	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources"
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +32,8 @@ func TestServiceReconcile(t *testing.T) {
 		{
 			Name:     "first-reconcile",
 			Resource: simpleRunLatest("default", "first-reconcile", "not-ready"),
-			ExpectedStatus: v1alpha1.RouteStatus{
-				DomainInternal: "first-reconcile.default.svc.cluster.local",
-				Targetable:     &duckv1alpha1.Targetable{DomainInternal: "first-reconcile.default.svc.cluster.local"},
+			ExpectedStatus: K8sServiceStatus{
+				Domain: "first-reconcile.default.svc.cluster.local",
 			},
 			ExpectedCreates: Creates{
 				resources.MakeK8sService(
@@ -49,7 +47,7 @@ func TestServiceReconcile(t *testing.T) {
 				InduceFailure("create", "services"),
 			},
 			ExpectError:    true,
-			ExpectedStatus: v1alpha1.RouteStatus{},
+			ExpectedStatus: K8sServiceStatus{},
 			ExpectedCreates: Creates{
 				resources.MakeK8sService(
 					simpleRunLatest("default", "first-reconcile", "not-ready"),
@@ -63,9 +61,8 @@ func TestServiceReconcile(t *testing.T) {
 					simpleRunLatest("default", "steady-state", "not-ready"),
 				),
 			},
-			ExpectedStatus: v1alpha1.RouteStatus{
-				DomainInternal: "steady-state.default.svc.cluster.local",
-				Targetable:     &duckv1alpha1.Targetable{DomainInternal: "steady-state.default.svc.cluster.local"},
+			ExpectedStatus: K8sServiceStatus{
+				Domain: "steady-state.default.svc.cluster.local",
 			},
 		}, {
 			Name:     "service-spec-change",
@@ -82,9 +79,8 @@ func TestServiceReconcile(t *testing.T) {
 					simpleRunLatest("default", "service-change", "not-ready"),
 				),
 			},
-			ExpectedStatus: v1alpha1.RouteStatus{
-				DomainInternal: "service-change.default.svc.cluster.local",
-				Targetable:     &duckv1alpha1.Targetable{DomainInternal: "service-change.default.svc.cluster.local"},
+			ExpectedStatus: K8sServiceStatus{
+				Domain: "service-change.default.svc.cluster.local",
 			},
 		}, {
 			Name:     "service-update-failed",
@@ -100,7 +96,7 @@ func TestServiceReconcile(t *testing.T) {
 				InduceFailure("update", "services"),
 			},
 			ExpectError:    true,
-			ExpectedStatus: v1alpha1.RouteStatus{},
+			ExpectedStatus: K8sServiceStatus{},
 			ExpectedUpdates: Updates{
 				resources.MakeK8sService(
 					simpleRunLatest("default", "service-change", "not-ready"),
@@ -117,9 +113,8 @@ func TestServiceReconcile(t *testing.T) {
 					"127.0.0.1",
 				),
 			},
-			ExpectedStatus: v1alpha1.RouteStatus{
-				DomainInternal: "cluster-ip.default.svc.cluster.local",
-				Targetable:     &duckv1alpha1.Targetable{DomainInternal: "cluster-ip.default.svc.cluster.local"},
+			ExpectedStatus: K8sServiceStatus{
+				Domain: "cluster-ip.default.svc.cluster.local",
 			},
 		},
 	}

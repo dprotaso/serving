@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/config"
 
@@ -35,13 +34,8 @@ func TestDomainReconcile(t *testing.T) {
 				"example.com": {},
 			}},
 		),
-		Resource: simpleRunLatest("default", "first-reconcile", "config"),
-		ExpectedStatus: v1alpha1.RouteStatus{
-			Domain: "first-reconcile.default.example.com",
-			Targetable: &duckv1alpha1.Targetable{
-				"first-reconcile.default.svc.cluster.local",
-			},
-		},
+		Resource:       simpleRunLatest("default", "first-reconcile", "config"),
+		ExpectedStatus: DomainStatus("first-reconcile.default.example.com"),
 	}, {
 		Name: "config-change",
 		Context: contextWithDomainConfig(&config.Domain{
@@ -49,13 +43,8 @@ func TestDomainReconcile(t *testing.T) {
 				"new-example.com": {},
 			}},
 		),
-		Resource: simpleRunLatest("default", "config-change", "config"),
-		ExpectedStatus: v1alpha1.RouteStatus{
-			Domain: "config-change.default.new-example.com",
-			Targetable: &duckv1alpha1.Targetable{
-				"config-change.default.svc.cluster.local",
-			},
-		},
+		Resource:       simpleRunLatest("default", "config-change", "config"),
+		ExpectedStatus: DomainStatus("config-change.default.new-example.com"),
 	}, {
 		Name: "explicit-route-label-uses-different-domain",
 		Context: contextWithDomainConfig(&config.Domain{
@@ -70,12 +59,7 @@ func TestDomainReconcile(t *testing.T) {
 			simpleRunLatest("default", "explicit-label", "config"),
 			"app", "prod",
 		),
-		ExpectedStatus: v1alpha1.RouteStatus{
-			Domain: "explicit-label.default.explicit-example.com",
-			Targetable: &duckv1alpha1.Targetable{
-				"explicit-label.default.svc.cluster.local",
-			},
-		},
+		ExpectedStatus: DomainStatus("explicit-label.default.explicit-example.com"),
 	}}
 
 	scenarios.Run(t, PhaseSetup(NewDomain))

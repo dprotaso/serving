@@ -40,6 +40,44 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
+type (
+	VirtualService struct {
+		ConfigurationLister  servinglisters.ConfigurationLister
+		RevisionLister       servinglisters.RevisionLister
+		VirtualServiceLister istiolisters.VirtualServiceLister
+
+		ServingClient servingclientset.Interface
+		SharedClient  sharedclientset.Interface
+
+		Recorder record.EventRecorder
+		Tracker  tracker.Interface
+	}
+
+	VirtualServiceStatus struct {
+		Error   error
+		Traffic []v1alpha1.TrafficTarget
+	}
+)
+
+func (s VirtualServiceStatus) MergeInto(status *v1alpha1.RouteStatus) error {
+	if s.Error == nil {
+		status.Traffic = s.Traffic
+		status.MarkTrafficAssigned
+	}
+
+	badTarget, isTargetError := s.Error.(traffic.TargetError)
+	if badTarget != nil && isTargetError {
+		badTarget.MarkBadTrafficTarget(&status)
+		return nil
+	} else {
+		// An error that's not due to missing traffic target should
+		// make us fail fast.
+		status.MarkUnknownTrafficError(s.Error.Error())
+	}
+
+	return nil
+}
+
 func NewVirtualService(o reconciler.CommonOptions, d *reconcilerv1alpha1.DependencyFactory) *VirtualService {
 	return &VirtualService{
 		ConfigurationLister:  d.Serving.InformerFactory.Serving().V1alpha1().Configurations().Lister(),
@@ -51,18 +89,6 @@ func NewVirtualService(o reconciler.CommonOptions, d *reconcilerv1alpha1.Depende
 		Recorder:      o.Recorder,
 		Tracker:       o.ObjectTracker,
 	}
-}
-
-type VirtualService struct {
-	ConfigurationLister  servinglisters.ConfigurationLister
-	RevisionLister       servinglisters.RevisionLister
-	VirtualServiceLister istiolisters.VirtualServiceLister
-
-	ServingClient servingclientset.Interface
-	SharedClient  sharedclientset.Interface
-
-	Recorder record.EventRecorder
-	Tracker  tracker.Interface
 }
 
 func (p *VirtualService) Triggers() []reconciler.Trigger {
@@ -81,8 +107,9 @@ func (p *VirtualService) Triggers() []reconciler.Trigger {
 	}
 }
 
-func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error) {
-	var status v1alpha1.RouteStatus
+func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) (VirtualServiceStatus, error) {
+
+	var status VirtualServiceStatus
 
 	logger := logging.FromContext(ctx)
 	logger.Infof("Reconciling route - virtual service")
@@ -107,20 +134,11 @@ func (p *VirtualService) Reconcile(ctx context.Context, route *v1alpha1.Route) (
 		}
 	}
 
-	badTarget, isTargetError := err.(traffic.TargetError)
-	if err != nil && !isTargetError {
-		// An error that's not due to missing traffic target should
-		// make us fail fast.
-		status.MarkUnknownTrafficError(err.Error())
+	if err != nil {
+		status.err = err
 		return status, err
 	}
 
-	if badTarget != nil && isTargetError {
-		badTarget.MarkBadTrafficTarget(&status)
-
-		// Traffic targets aren't ready, no need to configure Route.
-		return status, nil
-	}
 	logger.Info("All referred targets are routable.  Creating Istio VirtualService.")
 
 	domain := routeDomain(ctx, route)

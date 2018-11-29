@@ -35,9 +35,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type PartialStatus interface {
+	MergeInto(*v1alpha1.RouteStatus) error
+}
+
 type RoutePhase interface {
 	reconciler.Phase
-	Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error)
+	Reconcile(ctx context.Context, route *v1alpha1.Route) (PartialStatus, error)
 }
 
 type Reconciler struct {

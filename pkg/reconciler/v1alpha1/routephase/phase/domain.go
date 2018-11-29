@@ -20,27 +20,29 @@ import (
 	"context"
 	"fmt"
 
-	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
 	reconcilerv1alpha1 "github.com/knative/serving/pkg/reconciler/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/config"
-	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources/names"
+)
+
+type (
+	Domain struct{}
+
+	DomainStatus string
 )
 
 func NewDomain(reconciler.CommonOptions, *reconcilerv1alpha1.DependencyFactory) *Domain {
 	return &Domain{}
 }
 
-type Domain struct{}
+func (s DomainStatus) MergeInto(status *v1alpha1.RouteStatus) error {
+	status.Domain = string(s)
+	return nil
+}
 
-func (p *Domain) Reconcile(ctx context.Context, route *v1alpha1.Route) (v1alpha1.RouteStatus, error) {
-	return v1alpha1.RouteStatus{
-		Domain: routeDomain(ctx, route),
-		Targetable: &duckv1alpha1.Targetable{
-			DomainInternal: names.K8sServiceFullname(route),
-		},
-	}, nil
+func (p *Domain) Reconcile(ctx context.Context, route *v1alpha1.Route) (DomainStatus, error) {
+	return DomainStatus(routeDomain(ctx, route)), nil
 }
 
 // TODO(dprotaso) should we just consolidate this with virtual service reconciler?

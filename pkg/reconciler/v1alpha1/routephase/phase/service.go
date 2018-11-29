@@ -35,18 +35,32 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
+type (
+	K8sService struct {
+		ServiceLister corev1listers.ServiceLister
+		KubeClientSet kubernetes.Interface
+		Recorder      record.EventRecorder
+	}
+
+	K8sServiceStatus struct {
+		Domain string
+	}
+)
+
+func (s K8sServiceStatus) MergeInto(status *v1alpha1.RouteStatus) error {
+	status.DomainInternal = s.Domain
+	status.Targetable = &duckv1alpha1.Targetable{
+		DomainInternal: s.Domain,
+	}
+	return nil
+}
+
 func NewK8sService(o reconciler.CommonOptions, d *reconcilerv1alpha1.DependencyFactory) *K8sService {
 	return &K8sService{
 		ServiceLister: d.Kubernetes.InformerFactory.Core().V1().Services().Lister(),
 		KubeClientSet: d.Kubernetes.Client,
 		Recorder:      o.Recorder,
 	}
-}
-
-type K8sService struct {
-	ServiceLister corev1listers.ServiceLister
-	KubeClientSet kubernetes.Interface
-	Recorder      record.EventRecorder
 }
 
 func (p *K8sService) Triggers() []reconciler.Trigger {
@@ -57,7 +71,12 @@ func (p *K8sService) Triggers() []reconciler.Trigger {
 	}}
 }
 
-func (p *K8sService) Reconcile(ctx context.Context, route *v1alpha1.Route) (status v1alpha1.RouteStatus, err error) {
+func (p *K8sService) Reconcile(ctx context.Context, route *v1alpha1.Route) (K8sServiceStatus, error) {
+
+	var (
+		status K8sServiceStatus
+		err    error
+	)
 
 	logger := logging.FromContext(ctx)
 	logger.Infof("Reconciling route - kubernetes service")
@@ -74,18 +93,15 @@ func (p *K8sService) Reconcile(ctx context.Context, route *v1alpha1.Route) (stat
 	}
 
 	if err != nil {
-		return
+		return status, err
 	}
 
 	// Update the information that makes us Targetable.
-	status.DomainInternal = names.K8sServiceFullname(route)
-	status.Targetable = &duckv1alpha1.Targetable{
-		DomainInternal: names.K8sServiceFullname(route),
-	}
+	status.Domain = names.K8sServiceFullname(route)
 
 	// TODO(mattmoor): This is where we'd look at the state of the Service and
 	// reflect any necessary state into the Route.
-	return
+	return status, nil
 }
 
 func (p *K8sService) create(logger *zap.SugaredLogger, route *v1alpha1.Route) error {

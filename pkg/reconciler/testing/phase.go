@@ -182,18 +182,16 @@ func (s *PhaseTest) ensurePhaseType(t *testing.T, phase interface{}) {
 	}
 
 	resourceType := reflect.TypeOf(s.Resource)
-	statusField, ok := resourceType.Elem().FieldByName("Status")
-
-	if !ok {
-		t.Fatalf("Resource %q must have a 'Status' field", resourceType)
-	}
+	//	statusField, ok := resourceType.Elem().FieldByName("Status")
+	//	if !ok {
+	//		t.Fatalf("Resource %q must have a 'Status' field", resourceType)
+	//	}
 
 	method, ok := phaseType.MethodByName("Reconcile")
 
 	errMsg := fmt.Sprintf(
-		"phase should have the method Reconcile(context.Context, %s) (%s, error)",
+		"phase should have the method Reconcile(context.Context, %s) (SomePartialStatus, error)",
 		resourceType,
-		statusField.Type,
 	)
 
 	if !ok {
@@ -220,9 +218,9 @@ func (s *PhaseTest) ensurePhaseType(t *testing.T, phase interface{}) {
 		t.Fatal(errMsg)
 	}
 
-	if method.Type.Out(0) != statusField.Type {
-		t.Fatal(errMsg)
-	}
+	//if method.Type.Out(0) != statusField.Type {
+	//	t.Fatal(errMsg)
+	//}
 
 	if method.Type.Out(1) != errorType {
 		t.Fatal(errMsg)
