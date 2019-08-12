@@ -21,13 +21,12 @@ import (
 
 	"knative.dev/pkg/kmeta"
 	"knative.dev/serving/pkg/apis/serving"
-	"knative.dev/serving/pkg/apis/serving/v1alpha1"
 )
 
 // MakeRevision creates a revision object from configuration.
-func MakeRevision(config *v1alpha1.Configuration) *v1alpha1.Revision {
+func MakeRevision(config *serving.Configuration) *serving.Revision {
 	// Start from the ObjectMeta/Spec inlined in the Configuration resources.
-	rev := &v1alpha1.Revision{
+	rev := &serving.Revision{
 		ObjectMeta: config.Spec.GetTemplate().ObjectMeta,
 		Spec:       config.Spec.GetTemplate().Spec,
 	}
@@ -48,7 +47,7 @@ func MakeRevision(config *v1alpha1.Configuration) *v1alpha1.Revision {
 }
 
 // UpdateRevisionLabels sets the revisions labels given a Configuration.
-func UpdateRevisionLabels(rev *v1alpha1.Revision, config *v1alpha1.Configuration) {
+func UpdateRevisionLabels(rev *serving.Revision, config *serving.Configuration) {
 	if rev.Labels == nil {
 		rev.Labels = make(map[string]string)
 	}
@@ -63,7 +62,7 @@ func UpdateRevisionLabels(rev *v1alpha1.Revision, config *v1alpha1.Configuration
 }
 
 // UpdateRevisionAnnotations sets the revisions annotations given a Configuration's updater annotation.
-func UpdateRevisionAnnotations(rev *v1alpha1.Revision, config *v1alpha1.Configuration) {
+func UpdateRevisionAnnotations(rev *serving.Revision, config *serving.Configuration) {
 	if rev.Annotations == nil {
 		rev.Annotations = make(map[string]string)
 	}
@@ -76,7 +75,7 @@ func UpdateRevisionAnnotations(rev *v1alpha1.Revision, config *v1alpha1.Configur
 }
 
 // RevisionLabelValueForKey returns the label value for the given key.
-func RevisionLabelValueForKey(key string, config *v1alpha1.Configuration) string {
+func RevisionLabelValueForKey(key string, config *serving.Configuration) string {
 	switch key {
 	case serving.ConfigurationLabelKey:
 		return config.Name

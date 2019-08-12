@@ -36,6 +36,7 @@ import (
 	"knative.dev/pkg/injection/clients/dynamicclient"
 	"knative.dev/pkg/injection/clients/kubeclient"
 	servingclient "knative.dev/serving/pkg/client/injection/client"
+	internalclient "knative.dev/serving/pkg/manual/injection/client"
 
 	cachingclientset "knative.dev/caching/pkg/client/clientset/versioned"
 	sharedclientset "knative.dev/pkg/client/clientset/versioned"
@@ -45,6 +46,7 @@ import (
 	"knative.dev/pkg/logging/logkey"
 	clientset "knative.dev/serving/pkg/client/clientset/versioned"
 	servingScheme "knative.dev/serving/pkg/client/clientset/versioned/scheme"
+	internalclientset "knative.dev/serving/pkg/client/serving/clientset/internalversion"
 )
 
 const (
@@ -69,7 +71,12 @@ type Base struct {
 	SharedClientSet sharedclientset.Interface
 
 	// ServingClientSet allows us to configure Serving objects
+	// TODO(dprotaso) Rename
 	ServingClientSet clientset.Interface
+
+	// InternalClientSet allows us to configure internal serving objects
+	// TODO(dprotaso) Rename
+	InternalClientSet internalclientset.Interface
 
 	// DynamicClientSet allows us to configure pluggable Build objects
 	DynamicClientSet dynamic.Interface
@@ -136,15 +143,16 @@ func NewBase(ctx context.Context, controllerAgentName string, cmw configmap.Watc
 	}
 
 	base := &Base{
-		KubeClientSet:    kubeClient,
-		SharedClientSet:  sharedclient.Get(ctx),
-		DynamicClientSet: dynamicclient.Get(ctx),
-		ServingClientSet: servingclient.Get(ctx),
-		CachingClientSet: cachingclient.Get(ctx),
-		ConfigMapWatcher: cmw,
-		Recorder:         recorder,
-		StatsReporter:    statsReporter,
-		Logger:           logger,
+		KubeClientSet:     kubeClient,
+		SharedClientSet:   sharedclient.Get(ctx),
+		DynamicClientSet:  dynamicclient.Get(ctx),
+		ServingClientSet:  servingclient.Get(ctx),
+		InternalClientSet: internalclient.Get(ctx),
+		CachingClientSet:  cachingclient.Get(ctx),
+		ConfigMapWatcher:  cmw,
+		Recorder:          recorder,
+		StatsReporter:     statsReporter,
+		Logger:            logger,
 	}
 
 	return base

@@ -29,10 +29,6 @@ import (
 	fakeautoscalingv1alpha1 "knative.dev/serving/pkg/client/clientset/versioned/typed/autoscaling/v1alpha1/fake"
 	networkingv1alpha1 "knative.dev/serving/pkg/client/clientset/versioned/typed/networking/v1alpha1"
 	fakenetworkingv1alpha1 "knative.dev/serving/pkg/client/clientset/versioned/typed/networking/v1alpha1/fake"
-	servingv1alpha1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1alpha1"
-	fakeservingv1alpha1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1alpha1/fake"
-	servingv1beta1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1beta1"
-	fakeservingv1beta1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -95,19 +91,4 @@ func (c *Clientset) NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1In
 // Networking retrieves the NetworkingV1alpha1Client
 func (c *Clientset) Networking() networkingv1alpha1.NetworkingV1alpha1Interface {
 	return &fakenetworkingv1alpha1.FakeNetworkingV1alpha1{Fake: &c.Fake}
-}
-
-// ServingV1alpha1 retrieves the ServingV1alpha1Client
-func (c *Clientset) ServingV1alpha1() servingv1alpha1.ServingV1alpha1Interface {
-	return &fakeservingv1alpha1.FakeServingV1alpha1{Fake: &c.Fake}
-}
-
-// ServingV1beta1 retrieves the ServingV1beta1Client
-func (c *Clientset) ServingV1beta1() servingv1beta1.ServingV1beta1Interface {
-	return &fakeservingv1beta1.FakeServingV1beta1{Fake: &c.Fake}
-}
-
-// Serving retrieves the ServingV1beta1Client
-func (c *Clientset) Serving() servingv1beta1.ServingV1beta1Interface {
-	return &fakeservingv1beta1.FakeServingV1beta1{Fake: &c.Fake}
 }

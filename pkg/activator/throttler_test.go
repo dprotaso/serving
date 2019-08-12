@@ -30,14 +30,13 @@ import (
 	"knative.dev/pkg/system"
 	"knative.dev/pkg/test/helpers"
 	"knative.dev/serving/pkg/apis/networking"
-	nv1a1 "knative.dev/serving/pkg/apis/networking/v1alpha1"
+	"knative.dev/serving/pkg/apis/networking/v1alpha1"
 	"knative.dev/serving/pkg/apis/serving"
-	"knative.dev/serving/pkg/apis/serving/v1alpha1"
 	"knative.dev/serving/pkg/apis/serving/v1beta1"
-	servingfake "knative.dev/serving/pkg/client/clientset/versioned/fake"
-	servinginformers "knative.dev/serving/pkg/client/informers/externalversions"
 	netlisters "knative.dev/serving/pkg/client/listers/networking/v1alpha1"
-	servinglisters "knative.dev/serving/pkg/client/listers/serving/v1alpha1"
+	servingfake "knative.dev/serving/pkg/client/serving/clientset/internalversion/fake"
+	servinginformers "knative.dev/serving/pkg/client/serving/informers/internalversion"
+	servinglisters "knative.dev/serving/pkg/client/serving/listers/serving/internalversion"
 	"knative.dev/serving/pkg/queue"
 
 	corev1 "k8s.io/api/core/v1"
@@ -408,22 +407,20 @@ func TestHelper_ReactToEndpoints(t *testing.T) {
 	}
 }
 
-func revisionLister(namespace, name string, concurrency v1beta1.RevisionContainerConcurrencyType) servinglisters.RevisionLister {
-	rev := &v1alpha1.Revision{
+func revisionLister(namespace, name string, concurrency serving.RevisionContainerConcurrencyType) servinglisters.RevisionLister {
+	rev := &serving.Revision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: v1alpha1.RevisionSpec{
-			RevisionSpec: v1beta1.RevisionSpec{
-				ContainerConcurrency: concurrency,
-			},
+		Spec: serving.RevisionSpec{
+			ContainerConcurrency: concurrency,
 		},
 	}
 
 	fake := servingfake.NewSimpleClientset(rev)
 	informer := servinginformers.NewSharedInformerFactory(fake, 0)
-	revisions := informer.Serving().V1alpha1().Revisions()
+	revisions := informer.Serving().InternalVersion().Revisions()
 	revisions.Informer().GetIndexer().Add(rev)
 
 	return revisions.Lister()
@@ -447,7 +444,7 @@ func endpointsInformer(namespace, name string, count int) corev1informers.Endpoi
 }
 
 func sksLister(namespace, name string) netlisters.ServerlessServiceLister {
-	sks := &nv1a1.ServerlessService{
+	sks := &v1alpha1.ServerlessService{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -569,15 +566,13 @@ func TestInfiniteBreaker(t *testing.T) {
 func revisionListerN(namespace, name string, count int) servinglisters.RevisionLister {
 	revs := make([]runtime.Object, count)
 	for i := 0; i < count; i++ {
-		revs[i] = &v1alpha1.Revision{
+		revs[i] = &serving.Revision{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name + strconv.Itoa(i),
 				Namespace: namespace,
 			},
-			Spec: v1alpha1.RevisionSpec{
-				RevisionSpec: v1beta1.RevisionSpec{
-					ContainerConcurrency: 0,
-				},
+			Spec: serving.RevisionSpec{
+				ContainerConcurrency: 0,
 			},
 		}
 	}

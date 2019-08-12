@@ -32,7 +32,7 @@ import (
 	endpointsinformer "knative.dev/pkg/injection/informers/kubeinformers/corev1/endpoints"
 	serviceinformer "knative.dev/pkg/injection/informers/kubeinformers/corev1/service"
 	sksinformer "knative.dev/serving/pkg/client/injection/informers/networking/v1alpha1/serverlessservice"
-	revisioninformer "knative.dev/serving/pkg/client/injection/informers/serving/v1alpha1/revision"
+	revisioninformer "knative.dev/serving/pkg/manual/injection/informers/serving/internalversion/revision"
 
 	"github.com/kelseyhightower/envconfig"
 	zipkin "github.com/openzipkin/zipkin-go"

@@ -19,5 +19,7 @@ limitations under the License.
 // of the same resource
 
 // +k8s:deepcopy-gen=package
+// +k8s:defaulter-gen=TypeMeta
+// +k8s:conversion-gen=knative.dev/serving/pkg/apis/serving
 // +groupName=serving.knative.dev
 package v1alpha1

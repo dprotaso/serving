@@ -31,7 +31,6 @@ import (
 	autoscaling "knative.dev/serving/pkg/client/informers/externalversions/autoscaling"
 	internalinterfaces "knative.dev/serving/pkg/client/informers/externalversions/internalinterfaces"
 	networking "knative.dev/serving/pkg/client/informers/externalversions/networking"
-	serving "knative.dev/serving/pkg/client/informers/externalversions/serving"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -176,7 +175,6 @@ type SharedInformerFactory interface {
 
 	Autoscaling() autoscaling.Interface
 	Networking() networking.Interface
-	Serving() serving.Interface
 }
 
 func (f *sharedInformerFactory) Autoscaling() autoscaling.Interface {
@@ -185,8 +183,4 @@ func (f *sharedInformerFactory) Autoscaling() autoscaling.Interface {
 
 func (f *sharedInformerFactory) Networking() networking.Interface {
 	return networking.New(f, f.namespace, f.tweakListOptions)
-}
-
-func (f *sharedInformerFactory) Serving() serving.Interface {
-	return serving.New(f, f.namespace, f.tweakListOptions)
 }

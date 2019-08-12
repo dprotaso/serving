@@ -41,7 +41,7 @@ import (
 	fakeservingclientset "knative.dev/serving/pkg/client/clientset/versioned/fake"
 	palisters "knative.dev/serving/pkg/client/listers/autoscaling/v1alpha1"
 	networkinglisters "knative.dev/serving/pkg/client/listers/networking/v1alpha1"
-	servinglisters "knative.dev/serving/pkg/client/listers/serving/v1alpha1"
+	servinglisters "knative.dev/serving/pkg/client/serving/listers/serving/internalversion"
 )
 
 var clientSetSchemes = []func(*runtime.Scheme) error{

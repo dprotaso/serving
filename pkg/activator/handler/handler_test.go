@@ -44,7 +44,7 @@ import (
 	servingfake "knative.dev/serving/pkg/client/clientset/versioned/fake"
 	servinginformers "knative.dev/serving/pkg/client/informers/externalversions"
 	netlisters "knative.dev/serving/pkg/client/listers/networking/v1alpha1"
-	servinglisters "knative.dev/serving/pkg/client/listers/serving/v1alpha1"
+	servinglisters "knative.dev/serving/pkg/client/serving/listers/serving/internalversion"
 	"knative.dev/serving/pkg/network"
 	"knative.dev/serving/pkg/queue"
 	"knative.dev/serving/pkg/tracing"

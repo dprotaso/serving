@@ -22,8 +22,10 @@ import (
 	"time"
 
 	// Inject the fake informers we need.
-	_ "knative.dev/serving/pkg/client/injection/informers/serving/v1alpha1/configuration/fake"
-	_ "knative.dev/serving/pkg/client/injection/informers/serving/v1alpha1/revision/fake"
+	"knative.dev/serving/pkg/apis/serving"
+	"knative.dev/serving/pkg/apis/serving/v1beta1"
+	_ "knative.dev/serving/pkg/manual/injection/informers/serving/internalversion/configuration/fake"
+	_ "knative.dev/serving/pkg/manual/injection/informers/serving/internalversion/revision/fake"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,25 +36,20 @@ import (
 	"knative.dev/pkg/controller"
 	logtesting "knative.dev/pkg/logging/testing"
 	"knative.dev/pkg/ptr"
-	"knative.dev/serving/pkg/apis/serving/v1alpha1"
-	"knative.dev/serving/pkg/apis/serving/v1beta1"
 	"knative.dev/serving/pkg/reconciler"
 	"knative.dev/serving/pkg/reconciler/configuration/resources"
 
 	. "knative.dev/pkg/reconciler/testing"
 	. "knative.dev/serving/pkg/reconciler/testing/v1alpha1"
-	. "knative.dev/serving/pkg/testing/v1alpha1"
 )
 
-var revisionSpec = v1alpha1.RevisionSpec{
-	RevisionSpec: v1beta1.RevisionSpec{
-		PodSpec: corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Image: "busybox",
-			}},
-		},
-		TimeoutSeconds: ptr.Int64(60),
+var revisionSpec = serving.RevisionSpec{
+	PodSpec: corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Image: "busybox",
+		}},
 	},
+	TimeoutSeconds: ptr.Int64(60),
 }
 
 // This is heavily based on the way the OpenShift Ingress controller tests its reconciliation method.
@@ -93,18 +90,18 @@ func TestReconcile(t *testing.T) {
 	}, {
 		Name: "create revision byo name",
 		Objects: []runtime.Object{
-			cfg("byo-name-create", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			cfg("byo-name-create", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-create-foo"
 			}),
 		},
 		WantCreates: []runtime.Object{
-			rev("byo-name-create", "foo", 1234, func(rev *v1alpha1.Revision) {
+			rev("byo-name-create", "foo", 1234, func(rev *serving.Revision) {
 				rev.Name = "byo-name-create-foo"
 				rev.GenerateName = ""
 			}),
 		},
 		WantStatusUpdates: []clientgotesting.UpdateActionImpl{{
-			Object: cfg("byo-name-create", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			Object: cfg("byo-name-create", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-create-foo"
 			},
 				// The following properties are set when we first reconcile a
@@ -118,13 +115,13 @@ func TestReconcile(t *testing.T) {
 	}, {
 		Name: "create revision byo name (exists)",
 		Objects: []runtime.Object{
-			cfg("byo-name-exists", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			cfg("byo-name-exists", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-exists-foo"
 			},
 				// The following properties are set when we first reconcile a
 				// Configuration and a Revision is created.
 				WithLatestCreated("byo-name-exists-foo"), WithObservedGen),
-			rev("byo-name-exists", "foo", 1234, WithCreationTimestamp(now), func(rev *v1alpha1.Revision) {
+			rev("byo-name-exists", "foo", 1234, WithCreationTimestamp(now), func(rev *serving.Revision) {
 				rev.Name = "byo-name-exists-foo"
 				rev.GenerateName = ""
 			}),
@@ -134,16 +131,16 @@ func TestReconcile(t *testing.T) {
 		Name: "create revision byo name (exists, wrong generation, right spec)",
 		// This example shows what we might see with a `git revert` in GitOps.
 		Objects: []runtime.Object{
-			cfg("byo-name-git-revert", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			cfg("byo-name-git-revert", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-git-revert-foo"
 			}),
-			rev("byo-name-git-revert", "foo", 1200, WithCreationTimestamp(now), func(rev *v1alpha1.Revision) {
+			rev("byo-name-git-revert", "foo", 1200, WithCreationTimestamp(now), func(rev *serving.Revision) {
 				rev.Name = "byo-name-git-revert-foo"
 				rev.GenerateName = ""
 			}),
 		},
 		WantStatusUpdates: []clientgotesting.UpdateActionImpl{{
-			Object: cfg("byo-name-git-revert", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			Object: cfg("byo-name-git-revert", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-git-revert-foo"
 			}, WithLatestCreated("byo-name-git-revert-foo"), WithObservedGen),
 		}},
@@ -151,10 +148,10 @@ func TestReconcile(t *testing.T) {
 	}, {
 		Name: "create revision byo name (exists @ wrong generation w/ wrong spec)",
 		Objects: []runtime.Object{
-			cfg("byo-name-wrong-gen-wrong-spec", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			cfg("byo-name-wrong-gen-wrong-spec", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-wrong-gen-wrong-spec-foo"
 			}),
-			rev("byo-name-wrong-gen-wrong-spec", "foo", 1200, func(rev *v1alpha1.Revision) {
+			rev("byo-name-wrong-gen-wrong-spec", "foo", 1200, func(rev *serving.Revision) {
 				rev.Name = "byo-name-wrong-gen-wrong-spec-foo"
 				rev.GenerateName = ""
 				rev.Spec.GetContainer().Env = append(rev.Spec.GetContainer().Env, corev1.EnvVar{
@@ -164,7 +161,7 @@ func TestReconcile(t *testing.T) {
 			}),
 		},
 		WantStatusUpdates: []clientgotesting.UpdateActionImpl{{
-			Object: cfg("byo-name-wrong-gen-wrong-spec", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			Object: cfg("byo-name-wrong-gen-wrong-spec", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-name-wrong-gen-wrong-spec-foo"
 			}, MarkRevisionCreationFailed(`revisions.serving.knative.dev "byo-name-wrong-gen-wrong-spec-foo" already exists`)),
 		}},
@@ -172,17 +169,17 @@ func TestReconcile(t *testing.T) {
 	}, {
 		Name: "create revision byo name (exists not owned)",
 		Objects: []runtime.Object{
-			cfg("byo-rev-not-owned", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			cfg("byo-rev-not-owned", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-rev-not-owned-foo"
 			}),
-			rev("byo-rev-not-owned", "foo", 1200, func(rev *v1alpha1.Revision) {
+			rev("byo-rev-not-owned", "foo", 1200, func(rev *serving.Revision) {
 				rev.Name = "byo-rev-not-owned-foo"
 				rev.GenerateName = ""
 				rev.OwnerReferences = nil
 			}),
 		},
 		WantStatusUpdates: []clientgotesting.UpdateActionImpl{{
-			Object: cfg("byo-rev-not-owned", "foo", 1234, func(cfg *v1alpha1.Configuration) {
+			Object: cfg("byo-rev-not-owned", "foo", 1234, func(cfg *serving.Configuration) {
 				cfg.Spec.GetTemplate().Name = "byo-rev-not-owned-foo"
 			}, MarkRevisionCreationFailed(`revisions.serving.knative.dev "byo-rev-not-owned-foo" already exists`)),
 		}},
@@ -279,10 +276,10 @@ func TestReconcile(t *testing.T) {
 			cfg("bad-condition", "foo", 5555, WithLatestCreated("bad-condition"), WithObservedGen),
 			rev("bad-condition", "foo", 5555,
 				WithRevName("bad-condition"),
-				WithRevStatus(v1alpha1.RevisionStatus{
+				WithRevStatus(serving.RevisionStatus{
 					Status: duckv1beta1.Status{
 						Conditions: duckv1beta1.Conditions{{
-							Type:     v1alpha1.RevisionConditionReady,
+							Type:     serving.RevisionConditionReady,
 							Status:   "Bad",
 							Severity: "Error",
 						}},
@@ -404,15 +401,15 @@ func TestReconcile(t *testing.T) {
 	}))
 }
 
-func cfg(name, namespace string, generation int64, co ...ConfigOption) *v1alpha1.Configuration {
-	c := &v1alpha1.Configuration{
+func cfg(name, namespace string, generation int64, co ...ConfigOption) *serving.Configuration {
+	c := &serving.Configuration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
 			Namespace:  namespace,
 			Generation: generation,
 		},
-		Spec: v1alpha1.ConfigurationSpec{
-			Template: &v1alpha1.RevisionTemplateSpec{
+		Spec: serving.ConfigurationSpec{
+			Template: &serving.RevisionTemplateSpec{
 				Spec: *revisionSpec.DeepCopy(),
 			},
 		},
@@ -424,7 +421,7 @@ func cfg(name, namespace string, generation int64, co ...ConfigOption) *v1alpha1
 	return c
 }
 
-func rev(name, namespace string, generation int64, ro ...RevisionOption) *v1alpha1.Revision {
+func rev(name, namespace string, generation int64, ro ...RevisionOption) *serving.Revision {
 	r := resources.MakeRevision(cfg(name, namespace, generation))
 	r.SetDefaults(v1beta1.WithUpgradeViaDefaulting(context.Background()))
 	for _, opt := range ro {

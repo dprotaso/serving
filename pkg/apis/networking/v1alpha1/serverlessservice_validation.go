@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"knative.dev/pkg/apis"
-	"knative.dev/serving/pkg/apis/serving"
 )
 
 // Validate inspects and validates ClusterServerlessService object.
@@ -46,7 +45,9 @@ func (spec *ServerlessServiceSpec) Validate(ctx context.Context) *apis.FieldErro
 		all = all.Also(apis.ErrInvalidValue(spec.Mode, "mode"))
 	}
 
-	all = all.Also(serving.ValidateNamespacedObjectReference(&spec.ObjectRef).ViaField("objectRef"))
+	// TODO(dprotaso) RE_ENABLE THIS
+	// networking apis has a circular dependency with serving apis
+	//all = all.Also(serving.ValidateNamespacedObjectReference(&spec.ObjectRef).ViaField("objectRef"))
 
 	return all.Also(spec.ProtocolType.Validate(ctx).ViaField("protocolType"))
 }
