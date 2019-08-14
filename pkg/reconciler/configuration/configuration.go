@@ -30,10 +30,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
-	"knative.dev/serving/pkg/apis/serving"
-	"knative.dev/serving/pkg/apis/serving/v1alpha1"
-	"knative.dev/serving/pkg/apis/serving/v1beta1"
-	listers "knative.dev/serving/pkg/client/serving/listers/serving/v1alpha1"
+	"knative.dev/serving/pkg/apis/internalversions/serving"
+	servingcommon "knative.dev/serving/pkg/apis/serving"
+	listers "knative.dev/serving/pkg/client/serving/listers/serving/internalversion"
 	"knative.dev/serving/pkg/reconciler"
 	"knative.dev/serving/pkg/reconciler/configuration/resources"
 )
@@ -93,20 +92,23 @@ func (c *Reconciler) Reconcile(ctx context.Context, key string) error {
 		c.Recorder.Event(config, corev1.EventTypeWarning, "InternalError", reconcileErr.Error())
 		return reconcileErr
 	}
-	// TODO(mattmoor): Remove this after 0.7 cuts.
-	// If the spec has changed, then assume we need an upgrade and issue a patch to trigger
-	// the webhook to upgrade via defaulting.  Status updates do not trigger this due to the
-	// use of the /status resource.
-	if !equality.Semantic.DeepEqual(original.Spec, config.Spec) {
-		configurations := v1alpha1.SchemeGroupVersion.WithResource("configurations")
-		if err := c.MarkNeedsUpgrade(configurations, config.Namespace, config.Name); err != nil {
-			return err
-		}
-	}
+
+	// TODO(dprotaso) Figure out where this belongs
+	//
+	// // TODO(mattmoor): Remove this after 0.7 cuts.
+	// // If the spec has changed, then assume we need an upgrade and issue a patch to trigger
+	// // the webhook to upgrade via defaulting.  Status updates do not trigger this due to the
+	// // use of the /status resource.
+	// if !equality.Semantic.DeepEqual(original.Spec, config.Spec) {
+	// 	configurations := serving.SchemeGroupVersion.WithResource("configurations")
+	// 	if err := c.MarkNeedsUpgrade(configurations, config.Namespace, config.Name); err != nil {
+	// 		return err
+	// 	}
+	// }
 	return nil
 }
 
-func (c *Reconciler) reconcile(ctx context.Context, config *v1alpha1.Configuration) error {
+func (c *Reconciler) reconcile(ctx context.Context, config *serving.Configuration) error {
 	logger := logging.FromContext(ctx)
 	if config.GetDeletionTimestamp() != nil {
 		return nil
@@ -116,15 +118,18 @@ func (c *Reconciler) reconcile(ctx context.Context, config *v1alpha1.Configurati
 	// and may not have had all of the assumed defaults specified.  This won't result
 	// in this getting written back to the API Server, but lets downstream logic make
 	// assumptions about defaulting.
-	config.SetDefaults(v1beta1.WithUpgradeViaDefaulting(ctx))
+	//
+	// TODO(dprotaso) Figure out defaulting strategy
+	//	config.SetDefaults(v1beta1.WithUpgradeViaDefaulting(ctx))
 	config.Status.InitializeConditions()
 
-	if err := config.ConvertUp(ctx, &v1beta1.Configuration{}); err != nil {
-		if ce, ok := err.(*v1alpha1.CannotConvertError); ok {
-			config.Status.MarkResourceNotConvertible(ce)
-		}
-		return err
-	}
+	// TODO(dprotaso) Figure out how to test alpha => v1beta1 conversions
+	//	if err := config.ConvertUp(ctx, &v1beta1.Configuration{}); err != nil {
+	//		if ce, ok := err.(*serving.CannotConvertError); ok {
+	//			config.Status.MarkResourceNotConvertible(ce)
+	//		}
+	//		return err
+	//	}
 
 	// First, fetch the revision that should exist for the current generation.
 	lcr, err := c.latestCreatedRevision(config)
@@ -161,7 +166,7 @@ func (c *Reconciler) reconcile(ctx context.Context, config *v1alpha1.Configurati
 
 	// Last, determine whether we should set LatestReadyRevisionName to our
 	// LatestCreatedRevision based on its readiness.
-	rc := lcr.Status.GetCondition(v1alpha1.RevisionConditionReady)
+	rc := lcr.Status.GetCondition(serving.RevisionConditionReady)
 	switch {
 	case rc == nil || rc.Status == corev1.ConditionUnknown:
 		logger.Infof("Revision %q of configuration %q is not ready", revName, config.Name)
@@ -201,14 +206,14 @@ func (c *Reconciler) reconcile(ctx context.Context, config *v1alpha1.Configurati
 
 // CheckNameAvailability checks that if the named Revision specified by the Configuration
 // is available (not found), exists (but matches), or exists with conflict (doesn't match).
-func CheckNameAvailability(config *v1alpha1.Configuration, lister listers.RevisionLister) (*v1alpha1.Revision, error) {
+func CheckNameAvailability(config *serving.Configuration, lister listers.RevisionLister) (*serving.Revision, error) {
 	// If config.Spec.GetTemplate().Name is set, then we can directly look up
 	// the revision by name.
 	name := config.Spec.GetTemplate().Name
 	if name == "" {
 		return nil, nil
 	}
-	errConflict := errors.NewAlreadyExists(v1alpha1.Resource("revisions"), name)
+	errConflict := errors.NewAlreadyExists(serving.Resource("revisions"), name)
 
 	rev, err := lister.Revisions(config.Namespace).Get(name)
 	if errors.IsNotFound(err) {
@@ -224,7 +229,7 @@ func CheckNameAvailability(config *v1alpha1.Configuration, lister listers.Revisi
 	}
 
 	// Check the generation on this revision.
-	generationKey := serving.ConfigurationGenerationLabelKey
+	generationKey := servingcommon.ConfigurationGenerationLabelKey
 	expectedValue := resources.RevisionLabelValueForKey(generationKey, config)
 	if rev.Labels != nil && rev.Labels[generationKey] == expectedValue {
 		return rev, nil
@@ -237,31 +242,31 @@ func CheckNameAvailability(config *v1alpha1.Configuration, lister listers.Revisi
 	return rev, nil
 }
 
-func (c *Reconciler) latestCreatedRevision(config *v1alpha1.Configuration) (*v1alpha1.Revision, error) {
+func (c *Reconciler) latestCreatedRevision(config *serving.Configuration) (*serving.Revision, error) {
 	if rev, err := CheckNameAvailability(config, c.revisionLister); rev != nil || err != nil {
 		return rev, err
 	}
 
 	lister := c.revisionLister.Revisions(config.Namespace)
-	generationKey := serving.ConfigurationGenerationLabelKey
+	generationKey := servingcommon.ConfigurationGenerationLabelKey
 
 	list, err := lister.List(labels.SelectorFromSet(map[string]string{
-		generationKey:                 resources.RevisionLabelValueForKey(generationKey, config),
-		serving.ConfigurationLabelKey: config.Name,
+		generationKey:                       resources.RevisionLabelValueForKey(generationKey, config),
+		servingcommon.ConfigurationLabelKey: config.Name,
 	}))
 
 	if err == nil && len(list) > 0 {
 		return list[0], nil
 	}
 
-	return nil, errors.NewNotFound(v1alpha1.Resource("revisions"), fmt.Sprintf("revision for %s", config.Name))
+	return nil, errors.NewNotFound(serving.Resource("revisions"), fmt.Sprintf("revision for %s", config.Name))
 }
 
-func (c *Reconciler) createRevision(ctx context.Context, config *v1alpha1.Configuration) (*v1alpha1.Revision, error) {
+func (c *Reconciler) createRevision(ctx context.Context, config *serving.Configuration) (*serving.Revision, error) {
 	logger := logging.FromContext(ctx)
 
 	rev := resources.MakeRevision(config)
-	created, err := c.ServingClientSet.ServingV1alpha1().Revisions(config.Namespace).Create(rev)
+	created, err := c.InternalServingClientSet.Serving().Revisions(config.Namespace).Create(rev)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +276,7 @@ func (c *Reconciler) createRevision(ctx context.Context, config *v1alpha1.Config
 	return created, nil
 }
 
-func (c *Reconciler) updateStatus(desired *v1alpha1.Configuration) (*v1alpha1.Configuration, error) {
+func (c *Reconciler) updateStatus(desired *serving.Configuration) (*serving.Configuration, error) {
 	config, err := c.configurationLister.Configurations(desired.Namespace).Get(desired.Name)
 	if err != nil {
 		return nil, err
@@ -283,5 +288,5 @@ func (c *Reconciler) updateStatus(desired *v1alpha1.Configuration) (*v1alpha1.Co
 	// Don't modify the informers copy
 	existing := config.DeepCopy()
 	existing.Status = desired.Status
-	return c.ServingClientSet.ServingV1alpha1().Configurations(desired.Namespace).UpdateStatus(existing)
+	return c.InternalServingClientSet.Serving().Configurations(desired.Namespace).UpdateStatus(existing)
 }

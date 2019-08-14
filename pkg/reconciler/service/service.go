@@ -36,9 +36,9 @@ import (
 	"knative.dev/serving/pkg/apis/serving/v1beta1"
 	listers "knative.dev/serving/pkg/client/serving/listers/serving/v1alpha1"
 	"knative.dev/serving/pkg/reconciler"
-	cfgreconciler "knative.dev/serving/pkg/reconciler/configuration"
 	"knative.dev/serving/pkg/reconciler/service/resources"
 	resourcenames "knative.dev/serving/pkg/reconciler/service/resources/names"
+	todo "knative.dev/serving/pkg/reconciler/todo"
 )
 
 const (
@@ -160,7 +160,7 @@ func (c *Reconciler) reconcile(ctx context.Context, service *v1alpha1.Service) e
 	// by our Configuration and matches its generation before reprogramming the Route,
 	// otherwise a bad patch could lead to folks inadvertently routing traffic to a
 	// pre-existing Revision (possibly for another Configuration).
-	if _, err := cfgreconciler.CheckNameAvailability(config, c.revisionLister); err != nil &&
+	if _, err := todo.CheckNameAvailability(config, c.revisionLister); err != nil &&
 		!apierrs.IsNotFound(err) {
 		service.Status.MarkRevisionNameTaken(config.Spec.GetTemplate().Name)
 		return nil

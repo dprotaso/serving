@@ -39,9 +39,10 @@ import (
 	_ "knative.dev/serving/pkg/client/serving/injection/informers/serving/v1alpha1/revision/fake"
 	gcconfig "knative.dev/serving/pkg/gc"
 	pkgreconciler "knative.dev/serving/pkg/reconciler"
-	"knative.dev/serving/pkg/reconciler/configuration/resources"
 	"knative.dev/serving/pkg/reconciler/gc/config"
+
 	. "knative.dev/serving/pkg/reconciler/testing/v1alpha1"
+	todo "knative.dev/serving/pkg/reconciler/todo"
 	. "knative.dev/serving/pkg/testing/v1alpha1"
 )
 
@@ -342,7 +343,7 @@ func cfg(name, namespace string, generation int64, co ...ConfigOption) *v1alpha1
 }
 
 func rev(name, namespace string, generation int64, ro ...RevisionOption) *v1alpha1.Revision {
-	r := resources.MakeRevision(cfg(name, namespace, generation))
+	r := todo.MakeRevision(cfg(name, namespace, generation))
 	r.SetDefaults(v1beta1.WithUpgradeViaDefaulting(context.Background()))
 	for _, opt := range ro {
 		opt(r)

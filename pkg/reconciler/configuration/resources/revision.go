@@ -20,14 +20,14 @@ import (
 	"fmt"
 
 	"knative.dev/pkg/kmeta"
-	"knative.dev/serving/pkg/apis/serving"
-	"knative.dev/serving/pkg/apis/serving/v1alpha1"
+	"knative.dev/serving/pkg/apis/internalversions/serving"
+	servingcommon "knative.dev/serving/pkg/apis/serving"
 )
 
 // MakeRevision creates a revision object from configuration.
-func MakeRevision(config *v1alpha1.Configuration) *v1alpha1.Revision {
+func MakeRevision(config *serving.Configuration) *serving.Revision {
 	// Start from the ObjectMeta/Spec inlined in the Configuration resources.
-	rev := &v1alpha1.Revision{
+	rev := &serving.Revision{
 		ObjectMeta: config.Spec.GetTemplate().ObjectMeta,
 		Spec:       config.Spec.GetTemplate().Spec,
 	}
@@ -48,41 +48,41 @@ func MakeRevision(config *v1alpha1.Configuration) *v1alpha1.Revision {
 }
 
 // UpdateRevisionLabels sets the revisions labels given a Configuration.
-func UpdateRevisionLabels(rev *v1alpha1.Revision, config *v1alpha1.Configuration) {
+func UpdateRevisionLabels(rev *serving.Revision, config *serving.Configuration) {
 	if rev.Labels == nil {
 		rev.Labels = make(map[string]string)
 	}
 
 	for _, key := range []string{
-		serving.ConfigurationLabelKey,
-		serving.ServiceLabelKey,
-		serving.ConfigurationGenerationLabelKey,
+		servingcommon.ConfigurationLabelKey,
+		servingcommon.ServiceLabelKey,
+		servingcommon.ConfigurationGenerationLabelKey,
 	} {
 		rev.Labels[key] = RevisionLabelValueForKey(key, config)
 	}
 }
 
 // UpdateRevisionAnnotations sets the revisions annotations given a Configuration's updater annotation.
-func UpdateRevisionAnnotations(rev *v1alpha1.Revision, config *v1alpha1.Configuration) {
+func UpdateRevisionAnnotations(rev *serving.Revision, config *serving.Configuration) {
 	if rev.Annotations == nil {
 		rev.Annotations = make(map[string]string)
 	}
 
 	// Populate the CreatorAnnotation from configuration.
 	cans := config.GetAnnotations()
-	if c, ok := cans[serving.UpdaterAnnotation]; ok {
-		rev.Annotations[serving.CreatorAnnotation] = c
+	if c, ok := cans[servingcommon.UpdaterAnnotation]; ok {
+		rev.Annotations[servingcommon.CreatorAnnotation] = c
 	}
 }
 
 // RevisionLabelValueForKey returns the label value for the given key.
-func RevisionLabelValueForKey(key string, config *v1alpha1.Configuration) string {
+func RevisionLabelValueForKey(key string, config *serving.Configuration) string {
 	switch key {
-	case serving.ConfigurationLabelKey:
+	case servingcommon.ConfigurationLabelKey:
 		return config.Name
-	case serving.ServiceLabelKey:
-		return config.Labels[serving.ServiceLabelKey]
-	case serving.ConfigurationGenerationLabelKey:
+	case servingcommon.ServiceLabelKey:
+		return config.Labels[servingcommon.ServiceLabelKey]
+	case servingcommon.ConfigurationGenerationLabelKey:
 		return fmt.Sprintf("%d", config.Generation)
 	}
 

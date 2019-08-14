@@ -28,10 +28,9 @@ import (
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/system"
-	"knative.dev/serving/pkg/apis/serving/v1alpha1"
-	"knative.dev/serving/pkg/apis/serving/v1beta1"
-	fakeservingclient "knative.dev/serving/pkg/client/serving/injection/client/fake"
+	"knative.dev/serving/pkg/apis/internalversions/serving"
 	"knative.dev/serving/pkg/gc"
+	fakeservingclient "knative.dev/serving/pkg/manual/injection/client/fake"
 
 	. "knative.dev/pkg/reconciler/testing"
 )
@@ -40,46 +39,45 @@ const (
 	testNamespace = "test"
 )
 
-func getTestConfiguration() *v1alpha1.Configuration {
-	cfg := &v1alpha1.Configuration{
+func getTestConfiguration() *serving.Configuration {
+	cfg := &serving.Configuration{
 		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/apis/serving/v1alpha1/namespaces/test/configurations/test-config",
 			Name:      "test-config",
 			Namespace: testNamespace,
 		},
-		Spec: v1alpha1.ConfigurationSpec{
-			Template: &v1alpha1.RevisionTemplateSpec{
-				Spec: v1alpha1.RevisionSpec{
-					RevisionSpec: v1beta1.RevisionSpec{
-						PodSpec: corev1.PodSpec{
-							ServiceAccountName: "test-account",
-							// corev1.Container has a lot of setting.  We try to pass many
-							// of them here to verify that we pass through the settings to
-							// the derived Revisions.
-							Containers: []corev1.Container{{
-								Image:      "gcr.io/repo/image",
-								Command:    []string{"echo"},
-								Args:       []string{"hello", "world"},
-								WorkingDir: "/tmp",
-								Env: []corev1.EnvVar{{
-									Name:  "EDITOR",
-									Value: "emacs",
-								}},
-								LivenessProbe: &corev1.Probe{
-									TimeoutSeconds: 42,
-								},
-								ReadinessProbe: &corev1.Probe{
-									TimeoutSeconds: 43,
-								},
-								TerminationMessagePath: "/dev/null",
+		Spec: serving.ConfigurationSpec{
+			Template: &serving.RevisionTemplateSpec{
+				Spec: serving.RevisionSpec{
+					PodSpec: corev1.PodSpec{
+						ServiceAccountName: "test-account",
+						// corev1.Container has a lot of setting.  We try to pass many
+						// of them here to verify that we pass through the settings to
+						// the derived Revisions.
+						Containers: []corev1.Container{{
+							Image:      "gcr.io/repo/image",
+							Command:    []string{"echo"},
+							Args:       []string{"hello", "world"},
+							WorkingDir: "/tmp",
+							Env: []corev1.EnvVar{{
+								Name:  "EDITOR",
+								Value: "emacs",
 							}},
-						},
+							LivenessProbe: &corev1.Probe{
+								TimeoutSeconds: 42,
+							},
+							ReadinessProbe: &corev1.Probe{
+								TimeoutSeconds: 43,
+							},
+							TerminationMessagePath: "/dev/null",
+						}},
 					},
 				},
 			},
 		},
 	}
-	cfg.SetDefaults(context.Background())
+	// TODO(dprotaso) figure out defaults
+	// cfg.SetDefaults(context.Background())
 	return cfg
 }
 
@@ -110,7 +108,7 @@ func TestNewConfigurationCallsSyncHandler(t *testing.T) {
 
 	// Check for revision created as a signal that syncHandler ran
 	h.OnCreate(&servingClient.Fake, "revisions", func(obj runtime.Object) HookResult {
-		rev := obj.(*v1alpha1.Revision)
+		rev := obj.(*serving.Revision)
 		t.Logf("revision created: %q", rev.Name)
 
 		return HookComplete
@@ -125,7 +123,7 @@ func TestNewConfigurationCallsSyncHandler(t *testing.T) {
 	})
 
 	config := getTestConfiguration()
-	if _, err := servingClient.ServingV1alpha1().Configurations(config.Namespace).Create(config); err != nil {
+	if _, err := servingClient.Serving().Configurations(config.Namespace).Create(config); err != nil {
 		t.Fatalf("Unexpected error creating configuration: %v", err)
 	}
 
