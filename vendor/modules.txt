@@ -1051,7 +1051,7 @@ knative.dev/networking/pkg/client/injection/informers/networking/v1alpha1/server
 knative.dev/networking/pkg/client/injection/reconciler/networking/v1alpha1/serverlessservice
 knative.dev/networking/pkg/client/istio/listers/networking/v1alpha3
 knative.dev/networking/pkg/client/listers/networking/v1alpha1
-# knative.dev/pkg v0.0.0-20200721211453-557b6826ef85
+# knative.dev/pkg v0.0.0-20200724160958-a86246d33588 => github.com/dprotaso/pkg v0.0.0-20200724191621-736fd79f7b67
 ## explicit
 knative.dev/pkg/apiextensions/storageversion
 knative.dev/pkg/apiextensions/storageversion/cmd/migrate
@@ -1150,6 +1150,10 @@ knative.dev/pkg/test/prow
 knative.dev/pkg/test/slackutil
 knative.dev/pkg/test/spoof
 knative.dev/pkg/test/testgrid
+knative.dev/pkg/test/v2
+knative.dev/pkg/test/v2/environment
+knative.dev/pkg/test/v2/feature
+knative.dev/pkg/test/v2/requirement
 knative.dev/pkg/test/vegeta/pacers
 knative.dev/pkg/test/webhook-apicoverage/coveragecalculator
 knative.dev/pkg/test/webhook-apicoverage/resourcetree
@@ -1191,3 +1195,4 @@ sigs.k8s.io/yaml
 # k8s.io/client-go => k8s.io/client-go v0.17.6
 # k8s.io/code-generator => k8s.io/code-generator v0.17.6
 # k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200410145947-bcb3869e6f29
+# knative.dev/pkg => github.com/dprotaso/pkg v0.0.0-20200724191621-736fd79f7b67

@@ -18,8 +18,17 @@ limitations under the License.
 
 package ingress
 
-import "testing"
+import (
+	"flag"
+	"testing"
+)
+
+var conformance Conformance
+
+func init() {
+	conformance.AddFlags(flag.CommandLine)
+}
 
 func TestIngressConformance(t *testing.T) {
-	RunConformance(t)
+	RunConformance(test.NewContext(t, conformance))
 }

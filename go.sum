@@ -191,6 +191,7 @@ github.com/aws/aws-sdk-go v1.31.12/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZve
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
 github.com/bazelbuild/buildtools v0.0.0-20190917191645-69366ca98f89/go.mod h1:5JP0TXzWDHXv8qvxRC4InIazwdyDseBDbzESUMKk1yU=
 github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
+github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 h1:xJ4a3vCFaGF/jqvzLMYoU8P317H5OQ+Via4RmuPwCS0=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
@@ -274,6 +275,7 @@ github.com/devigned/tab v0.1.1/go.mod h1:XG9mPq0dFghrYvoBF3xdRrJzSTX1b7IQrvaL9mz
 github.com/dgrijalva/jwt-go v0.0.0-20170104182250-a601269ab70c/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
+github.com/dgryski/go-gk v0.0.0-20140819190930-201884a44051 h1:ByJUvQYyTtNNCVfYNM48q6uYUT4fAlN0wNmd3th4BSo=
 github.com/dgryski/go-gk v0.0.0-20140819190930-201884a44051/go.mod h1:qm+vckxRlDt0aOla0RYJJVeqHZlWfOm2UIxHaqPB46E=
 github.com/dgryski/go-gk v0.0.0-20200319235926-a69029f61654 h1:XOPLOMn/zT4jIgxfxSsoXPxkrzz0FaCHwp33x5POJ+Q=
 github.com/dgryski/go-gk v0.0.0-20200319235926-a69029f61654/go.mod h1:qm+vckxRlDt0aOla0RYJJVeqHZlWfOm2UIxHaqPB46E=
@@ -302,6 +304,8 @@ github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDD
 github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1/go.mod h1:cyGadeNEkKy96OOhEzfZl+yxihPEzKnqJwvfuSUqbZE=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96/go.mod h1:Qh8CwZgvJUkLughtfhJv5dyTYa91l1fOUCrgjqmcifM=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
+github.com/dprotaso/pkg v0.0.0-20200724191621-736fd79f7b67 h1:C1drkwnbelLXREV1sNHCXX4vxhBsTr4hNQp2FK6pd7E=
+github.com/dprotaso/pkg v0.0.0-20200724191621-736fd79f7b67/go.mod h1:pOJ+tu5k/SgHPGmecWqFguxJcIZozyDWlTlyldGcYGM=
 github.com/dsnet/compress v0.0.1/go.mod h1:Aw8dCMJ7RioblQeTqt88akK31OvO8Dhf5JflhBbQEHo=
 github.com/dsnet/golib v0.0.0-20171103203638-1ea166775780/go.mod h1:Lj+Z9rebOhdfkVLjJ8T6VcRQv3SXugXy999NBtR9aFY=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
@@ -568,6 +572,7 @@ github.com/googleapis/gax-go/v2 v2.0.5 h1:sjZBwGj9Jlw33ImPtvFviGYvseOtDM7hkSKB7+
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d/go.mod h1:sJBsCZ4ayReDTBIg8b9dl28c5xFWyhBTVRp3pOg5EKY=
 github.com/googleapis/gnostic v0.2.2/go.mod h1:sJBsCZ4ayReDTBIg8b9dl28c5xFWyhBTVRp3pOg5EKY=
+github.com/googleapis/gnostic v0.3.1 h1:WeAefnSUHlBb0iJKwxFDZdbfGwkd7xRNuV+IpXMJhYk=
 github.com/googleapis/gnostic v0.3.1/go.mod h1:on+2t9HRStVgn95RSsFWFz+6Q0Snyqv1awfrALZdbtU=
 github.com/googleapis/gnostic v0.4.0 h1:BXDUo8p/DaxC+4FJY/SSx3gvnx9C1VdHNgaUkiEL5mk=
 github.com/googleapis/gnostic v0.4.0/go.mod h1:on+2t9HRStVgn95RSsFWFz+6Q0Snyqv1awfrALZdbtU=
@@ -892,6 +897,7 @@ github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a/go.mod h1:c3At6R
 github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsTZCD3I8kEA=
 github.com/prometheus/procfs v0.0.5/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDaekg4FpcdQ=
 github.com/prometheus/procfs v0.0.6/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
+github.com/prometheus/procfs v0.0.10 h1:QJQN3jYQhkamO4mhfUWqdDH2asK7ONOI9MTWjyAxNKM=
 github.com/prometheus/procfs v0.0.10/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
 github.com/prometheus/procfs v0.0.11 h1:DhHlBtkHWPYi8O2y31JkK0TF+DGM+51OopZjH/Ia5qI=
 github.com/prometheus/procfs v0.0.11/go.mod h1:lV6e/gmhEcM9IjHGsFOCxxuZ+z1YqCvr4OA4YeYWdaU=
@@ -1600,6 +1606,7 @@ k8s.io/csi-translation-lib v0.17.0/go.mod h1:HEF7MEz7pOLJCnxabi45IPkhSsE/KmxPQks
 k8s.io/csi-translation-lib v0.17.4/go.mod h1:CsxmjwxEI0tTNMzffIAcgR9lX4wOh6AKHdxQrT7L0oo=
 k8s.io/gengo v0.0.0-20190128074634-0689ccc1d7d6/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
 k8s.io/gengo v0.0.0-20190822140433-26a664648505/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
+k8s.io/gengo v0.0.0-20191108084044-e500ee069b5c h1:iraFntD6FA5K/hBaPW2z/ZItJZEG63uc3ak5S0oDVEo=
 k8s.io/gengo v0.0.0-20191108084044-e500ee069b5c/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
 k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12 h1:pZzawYyz6VRNPVYpqGv61LWCimQv1BihyeqFrp50/G4=
 k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
@@ -1619,6 +1626,7 @@ k8s.io/test-infra v0.0.0-20200514184223-ba32c8aae783/go.mod h1:bW6thaPZfL2hW7ecj
 k8s.io/test-infra v0.0.0-20200617221206-ea73eaeab7ff/go.mod h1:L3+cRvwftUq8IW1TrHji5m3msnc4uck/7LsE/GR/aZk=
 k8s.io/test-infra v0.0.0-20200715094037-cc150f5ae724/go.mod h1:D2jUSuQFYy6McY2qbknsLUE9stqN0yIuJ+rjdUAxSCs=
 k8s.io/test-infra v0.0.0-20200721115715-1af01ef6b4c8/go.mod h1:4cRZlOy5Ka3Ym/orCmNWL2dsE39pN0xHFT0WFrZe2HQ=
+k8s.io/utils v0.0.0-20191114184206-e782cd3c129f h1:GiPwtSzdP43eI1hpPCbROQCCIgCuiMMNF8YUVLF3vJo=
 k8s.io/utils v0.0.0-20191114184206-e782cd3c129f/go.mod h1:sZAwmy6armz5eXlNoLmJcl4F1QuKu7sr+mFQ0byX7Ew=
 k8s.io/utils v0.0.0-20200124190032-861946025e34 h1:HjlUD6M0K3P8nRXmr2B9o4F9dUy9TCj/aEpReeyi6+k=
 k8s.io/utils v0.0.0-20200124190032-861946025e34/go.mod h1:sZAwmy6armz5eXlNoLmJcl4F1QuKu7sr+mFQ0byX7Ew=
@@ -1628,12 +1636,6 @@ knative.dev/caching v0.0.0-20200721163356-191470591e4c/go.mod h1:yCEJufJ5fN3jfqa
 knative.dev/eventing-contrib v0.11.2/go.mod h1:SnXZgSGgMSMLNFTwTnpaOH7hXDzTFtw0J8OmHflNx3g=
 knative.dev/networking v0.0.0-20200721203054-c218540746c9 h1:ZXdQiiK+8zP/uaiPIR+ftn5Zr3IP9kBOkucahWd/Hnw=
 knative.dev/networking v0.0.0-20200721203054-c218540746c9/go.mod h1:o5vF7egCdods9D0/SJKDVPtN2B12DeQ/kcwlZV68RPI=
-knative.dev/pkg v0.0.0-20200207155214-fef852970f43/go.mod h1:pgODObA1dTyhNoFxPZTTjNWfx6F0aKsKzn+vaT9XO/Q=
-knative.dev/pkg v0.0.0-20200721091635-3b7ca76a63e4/go.mod h1:uiDEJrNciKWl5fTSURoGXekCN5Wz9yo9ambLR80ISL0=
-knative.dev/pkg v0.0.0-20200721211453-557b6826ef85 h1:Yq3+57GZOg/EpRaoEUazq+BiM9g5CTIqgeDdFeIByc8=
-knative.dev/pkg v0.0.0-20200721211453-557b6826ef85/go.mod h1:uiDEJrNciKWl5fTSURoGXekCN5Wz9yo9ambLR80ISL0=
-knative.dev/test-infra v0.0.0-20200719034534-5adf654f5ed5 h1:ZspjtLBz7pzkB9PvPxSgDNHVNftTU1mmjtYh+j5LZJE=
-knative.dev/test-infra v0.0.0-20200719034534-5adf654f5ed5/go.mod h1:mAsPDmFmlsTJjRWplWBz8xtEiarSgvGiiOjkGj4Or1g=
 knative.dev/test-infra v0.0.0-20200720224135-d2706240545c/go.mod h1:mAsPDmFmlsTJjRWplWBz8xtEiarSgvGiiOjkGj4Or1g=
 knative.dev/test-infra v0.0.0-20200721175154-c98db9bd4d5d h1:GFzUmKNa8SVL3uMwa3R+NOjaSY1oUzxNdNWW3j5HrZ4=
 knative.dev/test-infra v0.0.0-20200721175154-c98db9bd4d5d/go.mod h1:kzRhTm5L08eDQFRl8NKSAN93lz6IZWQMs+2TjTCN+VA=

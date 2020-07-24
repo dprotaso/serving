@@ -17,56 +17,59 @@ limitations under the License.
 package ingress
 
 import (
+	"flag"
+	"knative.dev/pkg/test/v2"
 	"testing"
-
-	"knative.dev/serving/test"
 )
+
+type Conformance struct {
+	test.BaseConfig
+	IngressClass string
+}
+
+func (c *Conformance) AddFlags(fs *flag.FlagSet) {
+	c.Context.AddFlags(fs)
+
+	flag.StringVar(&c.IngressClass,
+		"ingress.class",
+		"",
+		"Set this flag to the ingress class to test against.")
+}
 
 // RunConformance will run ingress conformance tests
 //
 // Depending on the options it may test alpha and beta features
-func RunConformance(t *testing.T) {
-	t.Run("basics", TestBasics)
-	t.Run("basics/http2", TestBasicsHTTP2)
+func RunConformance(tt *testing.T, c *Conformance) {
+	t := test.NewContext(t, c)
 
-	t.Run("grpc", TestGRPC)
-	t.Run("grpc/split", TestGRPCSplit)
+	t.Stable("basics", TestBasics)
+	t.Stable("basics/http2", TestBasicsHTTP2)
 
-	t.Run("headers/pre-split", TestPreSplitSetHeaders)
-	t.Run("headers/post-split", TestPostSplitSetHeaders)
+	t.Stable("grpc", TestGRPC)
+	t.Stable("grpc/split", TestGRPCSplit)
 
-	t.Run("hosts/multiple", TestMultipleHosts)
+	t.Stable("headers/pre-split", TestPreSplitSetHeaders)
+	t.Stable("headers/post-split", TestPostSplitSetHeaders)
 
-	t.Run("dispatch/path", TestPath)
-	t.Run("dispatch/percentage", TestPercentage)
-	t.Run("dispatch/path_and_percentage", TestPathAndPercentageSplit)
+	t.Stable("hosts/multiple", TestMultipleHosts)
 
-	t.Run("retry", TestRetry)
-	t.Run("timeout", TestTimeout)
+	t.Stable("dispatch/path", TestPath)
+	t.Stable("dispatch/percentage", TestPercentage)
+	t.Stable("dispatch/path_and_percentage", TestPathAndPercentageSplit)
 
-	t.Run("tls", TestIngressTLS)
-	t.Run("update", TestUpdate)
+	t.Stable("retry", TestRetry)
+	t.Stable("timeout", TestTimeout)
 
-	t.Run("visibility", TestVisibility)
-	t.Run("visibility/split", TestVisibilitySplit)
-	t.Run("visibility/path", TestVisibilityPath)
+	t.Stable("tls", TestIngressTLS)
+	t.Stable("update", TestUpdate)
 
-	t.Run("websocket", TestWebsocket)
-	t.Run("websocket/split", TestWebsocketSplit)
+	t.Stable("visibility", TestVisibility)
+	t.Stable("visibility/split", TestVisibilitySplit)
+	t.Stable("visibility/path", TestVisibilityPath)
 
-	// TODO(dprotaso) we'll need something more robust
-	// in the long term that lets downstream
-	// implementations to better select which tests
-	// should be run -  selection across various
-	// dimensions
-	// ie. state - alpha, beta, ga
-	// ie. requirement - must, should, may
-	if test.ServingFlags.EnableBetaFeatures {
-		// Add your conformance test for beta features
-	}
+	t.Stable("websocket", TestWebsocket)
+	t.Stable("websocket/split", TestWebsocketSplit)
 
-	if test.ServingFlags.EnableAlphaFeatures {
-		// Add your conformance test for alpha features
-		t.Run("headers/tags", TestTagHeaders)
-	}
+	// Add your conformance test for alpha features
+	t.Alpha("headers/tags", TestTagHeaders)
 }
