@@ -16,234 +16,234 @@ limitations under the License.
 
 package ingress
 
-import (
-	"errors"
-	"math"
-	"testing"
+// import (
+// 	"errors"
+// 	"math"
+// 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"knative.dev/networking/pkg/apis/networking"
-	"knative.dev/networking/pkg/apis/networking/v1alpha1"
-	"knative.dev/pkg/pool"
-	"knative.dev/serving/test"
-)
+// 	"k8s.io/apimachinery/pkg/util/intstr"
+// 	"k8s.io/apimachinery/pkg/util/sets"
+// 	"knative.dev/networking/pkg/apis/networking"
+// 	"knative.dev/networking/pkg/apis/networking/v1alpha1"
+// 	"knative.dev/pkg/pool"
+// 	"knative.dev/serving/test"
+// )
 
-// TestPath verifies that an Ingress properly dispatches to backends based on the path of the URL.
-func TestPath(t *testing.T) {
-	t.Parallel()
-	clients := test.Setup(t)
+// // TestPath verifies that an Ingress properly dispatches to backends based on the path of the URL.
+// func TestPath(t *testing.T) {
+// 	t.Parallel()
+// 	clients := test.Setup(t)
 
-	// For /foo
-	fooName, fooPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	// For /foo
+// 	fooName, fooPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	// For /bar
-	barName, barPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	// For /bar
+// 	barName, barPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	// For /baz
-	bazName, bazPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	// For /baz
+// 	bazName, bazPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	// Use a post-split injected header to establish which split we are sending traffic to.
-	const headerName = "Which-Backend"
+// 	// Use a post-split injected header to establish which split we are sending traffic to.
+// 	const headerName = "Which-Backend"
 
-	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
-		Rules: []v1alpha1.IngressRule{{
-			Hosts:      []string{name + ".example.com"},
-			Visibility: v1alpha1.IngressVisibilityExternalIP,
-			HTTP: &v1alpha1.HTTPIngressRuleValue{
-				Paths: []v1alpha1.HTTPIngressPath{{
-					Path: "/foo",
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      fooName,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(fooPort),
-						},
-						// Append different headers to each split, which lets us identify
-						// which backend we hit.
-						AppendHeaders: map[string]string{
-							headerName: fooName,
-						},
-						Percent: 100,
-					}},
-				}, {
-					Path: "/bar",
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      barName,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(barPort),
-						},
-						// Append different headers to each split, which lets us identify
-						// which backend we hit.
-						AppendHeaders: map[string]string{
-							headerName: barName,
-						},
-						Percent: 100,
-					}},
-				}, {
-					Path: "/baz",
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      bazName,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(bazPort),
-						},
-						// Append different headers to each split, which lets us identify
-						// which backend we hit.
-						AppendHeaders: map[string]string{
-							headerName: bazName,
-						},
-						Percent: 100,
-					}},
-				}, {
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      name,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(port),
-						},
-						// Append different headers to each split, which lets us identify
-						// which backend we hit.
-						AppendHeaders: map[string]string{
-							headerName: name,
-						},
-						Percent: 100,
-					}},
-				}},
-			},
-		}},
-	})
-	defer cancel()
+// 	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
+// 		Rules: []v1alpha1.IngressRule{{
+// 			Hosts:      []string{name + ".example.com"},
+// 			Visibility: v1alpha1.IngressVisibilityExternalIP,
+// 			HTTP: &v1alpha1.HTTPIngressRuleValue{
+// 				Paths: []v1alpha1.HTTPIngressPath{{
+// 					Path: "/foo",
+// 					Splits: []v1alpha1.IngressBackendSplit{{
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      fooName,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(fooPort),
+// 						},
+// 						// Append different headers to each split, which lets us identify
+// 						// which backend we hit.
+// 						AppendHeaders: map[string]string{
+// 							headerName: fooName,
+// 						},
+// 						Percent: 100,
+// 					}},
+// 				}, {
+// 					Path: "/bar",
+// 					Splits: []v1alpha1.IngressBackendSplit{{
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      barName,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(barPort),
+// 						},
+// 						// Append different headers to each split, which lets us identify
+// 						// which backend we hit.
+// 						AppendHeaders: map[string]string{
+// 							headerName: barName,
+// 						},
+// 						Percent: 100,
+// 					}},
+// 				}, {
+// 					Path: "/baz",
+// 					Splits: []v1alpha1.IngressBackendSplit{{
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      bazName,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(bazPort),
+// 						},
+// 						// Append different headers to each split, which lets us identify
+// 						// which backend we hit.
+// 						AppendHeaders: map[string]string{
+// 							headerName: bazName,
+// 						},
+// 						Percent: 100,
+// 					}},
+// 				}, {
+// 					Splits: []v1alpha1.IngressBackendSplit{{
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      name,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(port),
+// 						},
+// 						// Append different headers to each split, which lets us identify
+// 						// which backend we hit.
+// 						AppendHeaders: map[string]string{
+// 							headerName: name,
+// 						},
+// 						Percent: 100,
+// 					}},
+// 				}},
+// 			},
+// 		}},
+// 	})
+// 	defer cancel()
 
-	tests := map[string]string{
-		"/foo":  fooName,
-		"/bar":  barName,
-		"/baz":  bazName,
-		"":      name,
-		"/asdf": name,
-	}
+// 	tests := map[string]string{
+// 		"/foo":  fooName,
+// 		"/bar":  barName,
+// 		"/baz":  bazName,
+// 		"":      name,
+// 		"/asdf": name,
+// 	}
 
-	for path, want := range tests {
-		t.Run(path, func(t *testing.T) {
-			ri := RuntimeRequest(t, client, "http://"+name+".example.com"+path)
-			if ri == nil {
-				return
-			}
+// 	for path, want := range tests {
+// 		t.Run(path, func(t *testing.T) {
+// 			ri := RuntimeRequest(t, client, "http://"+name+".example.com"+path)
+// 			if ri == nil {
+// 				return
+// 			}
 
-			got := ri.Request.Headers.Get(headerName)
-			if got != want {
-				t.Errorf("Header[%q] = %q, wanted %q", headerName, got, want)
-			}
-		})
-	}
-}
+// 			got := ri.Request.Headers.Get(headerName)
+// 			if got != want {
+// 				t.Errorf("Header[%q] = %q, wanted %q", headerName, got, want)
+// 			}
+// 		})
+// 	}
+// }
 
-func TestPathAndPercentageSplit(t *testing.T) {
-	t.Parallel()
-	clients := test.Setup(t)
+// func TestPathAndPercentageSplit(t *testing.T) {
+// 	t.Parallel()
+// 	clients := test.Setup(t)
 
-	fooName, fooPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	fooName, fooPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	barName, barPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	barName, barPort, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
+// 	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 	defer cancel()
 
-	// Use a post-split injected header to establish which split we are sending traffic to.
-	const headerName = "Which-Backend"
+// 	// Use a post-split injected header to establish which split we are sending traffic to.
+// 	const headerName = "Which-Backend"
 
-	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
-		Rules: []v1alpha1.IngressRule{{
-			Hosts:      []string{name + ".example.com"},
-			Visibility: v1alpha1.IngressVisibilityExternalIP,
-			HTTP: &v1alpha1.HTTPIngressRuleValue{
-				Paths: []v1alpha1.HTTPIngressPath{{
-					Path: "/foo",
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      fooName,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(fooPort),
-						},
-						AppendHeaders: map[string]string{
-							headerName: fooName,
-						},
-						Percent: 50,
-					}, {
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      barName,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(barPort),
-						},
-						AppendHeaders: map[string]string{
-							headerName: barName,
-						},
-						Percent: 50,
-					}},
-				}, {
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      name,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(port),
-						},
-						// Append different headers to each split, which lets us identify
-						// which backend we hit.
-						AppendHeaders: map[string]string{
-							headerName: name,
-						},
-						Percent: 100,
-					}},
-				}},
-			},
-		}},
-	})
-	defer cancel()
+// 	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
+// 		Rules: []v1alpha1.IngressRule{{
+// 			Hosts:      []string{name + ".example.com"},
+// 			Visibility: v1alpha1.IngressVisibilityExternalIP,
+// 			HTTP: &v1alpha1.HTTPIngressRuleValue{
+// 				Paths: []v1alpha1.HTTPIngressPath{{
+// 					Path: "/foo",
+// 					Splits: []v1alpha1.IngressBackendSplit{{
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      fooName,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(fooPort),
+// 						},
+// 						AppendHeaders: map[string]string{
+// 							headerName: fooName,
+// 						},
+// 						Percent: 50,
+// 					}, {
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      barName,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(barPort),
+// 						},
+// 						AppendHeaders: map[string]string{
+// 							headerName: barName,
+// 						},
+// 						Percent: 50,
+// 					}},
+// 				}, {
+// 					Splits: []v1alpha1.IngressBackendSplit{{
+// 						IngressBackend: v1alpha1.IngressBackend{
+// 							ServiceName:      name,
+// 							ServiceNamespace: test.ServingNamespace,
+// 							ServicePort:      intstr.FromInt(port),
+// 						},
+// 						// Append different headers to each split, which lets us identify
+// 						// which backend we hit.
+// 						AppendHeaders: map[string]string{
+// 							headerName: name,
+// 						},
+// 						Percent: 100,
+// 					}},
+// 				}},
+// 			},
+// 		}},
+// 	})
+// 	defer cancel()
 
-	const (
-		total     = 1000
-		totalHalf = total / 2
-		tolerance = total * 0.15
-	)
-	wantKeys := sets.NewString(fooName, barName)
-	resultCh := make(chan string, total)
+// 	const (
+// 		total     = 1000
+// 		totalHalf = total / 2
+// 		tolerance = total * 0.15
+// 	)
+// 	wantKeys := sets.NewString(fooName, barName)
+// 	resultCh := make(chan string, total)
 
-	wg := pool.New(8)
+// 	wg := pool.New(8)
 
-	for i := 0; i < total; i++ {
-		wg.Go(func() error {
-			ri := RuntimeRequest(t, client, "http://"+name+".example.com/foo")
-			if ri == nil {
-				return errors.New("failed to request")
-			}
-			resultCh <- ri.Request.Headers.Get(headerName)
-			return nil
-		})
-	}
-	if err := wg.Wait(); err != nil {
-		t.Errorf("Error while sending requests: %v", err)
-	}
-	close(resultCh)
+// 	for i := 0; i < total; i++ {
+// 		wg.Go(func() error {
+// 			ri := RuntimeRequest(t, client, "http://"+name+".example.com/foo")
+// 			if ri == nil {
+// 				return errors.New("failed to request")
+// 			}
+// 			resultCh <- ri.Request.Headers.Get(headerName)
+// 			return nil
+// 		})
+// 	}
+// 	if err := wg.Wait(); err != nil {
+// 		t.Errorf("Error while sending requests: %v", err)
+// 	}
+// 	close(resultCh)
 
-	got := make(map[string]float64, len(wantKeys))
-	for r := range resultCh {
-		got[r]++
-	}
-	for k, v := range got {
-		if !wantKeys.Has(k) {
-			t.Errorf("%s is not in the expected header say %v", k, wantKeys)
-		}
-		if math.Abs(v-totalHalf) > tolerance {
-			t.Errorf("Header %s got: %v times, want in [%v, %v] range", k, v, totalHalf-tolerance, totalHalf+tolerance)
-		}
-	}
-}
+// 	got := make(map[string]float64, len(wantKeys))
+// 	for r := range resultCh {
+// 		got[r]++
+// 	}
+// 	for k, v := range got {
+// 		if !wantKeys.Has(k) {
+// 			t.Errorf("%s is not in the expected header say %v", k, wantKeys)
+// 		}
+// 		if math.Abs(v-totalHalf) > tolerance {
+// 			t.Errorf("Header %s got: %v times, want in [%v, %v] range", k, v, totalHalf-tolerance, totalHalf+tolerance)
+// 		}
+// 	}
+//

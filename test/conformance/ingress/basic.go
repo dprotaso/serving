@@ -17,24 +17,20 @@ limitations under the License.
 package ingress
 
 import (
-	"testing"
-
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"knative.dev/networking/pkg/apis/networking"
 	"knative.dev/networking/pkg/apis/networking/v1alpha1"
-	"knative.dev/serving/test"
+	"knative.dev/pkg/test/v2"
 )
 
 // TestBasics verifies that a no frills Ingress exposes a simple Pod/Service via the public load balancer.
-func TestBasics(t *testing.T) {
+func TestBasics(t *test.T) {
 	t.Parallel()
-	clients := test.Setup(t)
-
-	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+	name, port, cancel := CreateRuntimeService(t, networking.ServicePortNameHTTP1)
 	defer cancel()
 
 	// Create a simple Ingress over the Service.
-	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
+	_, client, cancel := CreateIngressReady(t, v1alpha1.IngressSpec{
 		Rules: []v1alpha1.IngressRule{{
 			Hosts:      []string{name + ".example.com"},
 			Visibility: v1alpha1.IngressVisibilityExternalIP,
@@ -43,7 +39,7 @@ func TestBasics(t *testing.T) {
 					Splits: []v1alpha1.IngressBackendSplit{{
 						IngressBackend: v1alpha1.IngressBackend{
 							ServiceName:      name,
-							ServiceNamespace: test.ServingNamespace,
+							ServiceNamespace: t.Environment().Namespace,
 							ServicePort:      intstr.FromInt(port),
 						},
 					}},
@@ -58,15 +54,14 @@ func TestBasics(t *testing.T) {
 
 // TestBasicsHTTP2 verifies that the same no-frills Ingress over a Service with http/2 configured
 // will see a ProtoMajor of 2.
-func TestBasicsHTTP2(t *testing.T) {
+func TestBasicsHTTP2(t *test.T) {
 	t.Parallel()
-	clients := test.Setup(t)
 
-	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameH2C)
+	name, port, cancel := CreateRuntimeService(t, networking.ServicePortNameH2C)
 	defer cancel()
 
 	// Create a simple Ingress over the Service.
-	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
+	_, client, cancel := CreateIngressReady(t, v1alpha1.IngressSpec{
 		Rules: []v1alpha1.IngressRule{{
 			Hosts:      []string{name + ".example.com"},
 			Visibility: v1alpha1.IngressVisibilityExternalIP,
@@ -75,7 +70,7 @@ func TestBasicsHTTP2(t *testing.T) {
 					Splits: []v1alpha1.IngressBackendSplit{{
 						IngressBackend: v1alpha1.IngressBackend{
 							ServiceName:      name,
-							ServiceNamespace: test.ServingNamespace,
+							ServiceNamespace: t.Environment().Namespace,
 							ServicePort:      intstr.FromInt(port),
 						},
 					}},

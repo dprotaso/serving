@@ -23,12 +23,13 @@ import (
 	"testing"
 )
 
-var conformance Conformance
+var conformance Conformance = DefaultConfig()
 
 func init() {
+	// allow overrides via flags
 	conformance.AddFlags(flag.CommandLine)
 }
 
 func TestIngressConformance(t *testing.T) {
-	RunConformance(test.NewContext(t, conformance))
+	RunConformance(t, &conformance)
 }

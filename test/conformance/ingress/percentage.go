@@ -16,118 +16,118 @@ limitations under the License.
 
 package ingress
 
-import (
-	"errors"
-	"math"
-	"testing"
+// import (
+// 	"errors"
+// 	"math"
+// 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"knative.dev/networking/pkg/apis/networking"
-	"knative.dev/networking/pkg/apis/networking/v1alpha1"
-	"knative.dev/pkg/pool"
-	"knative.dev/serving/test"
-)
+// 	"k8s.io/apimachinery/pkg/util/intstr"
+// 	"knative.dev/networking/pkg/apis/networking"
+// 	"knative.dev/networking/pkg/apis/networking/v1alpha1"
+// 	"knative.dev/pkg/pool"
+// 	"knative.dev/serving/test"
+// )
 
-// TestPercentage verifies that an Ingress splitting over multiple backends respects
-// the given percentage distribution.
-func TestPercentage(t *testing.T) {
-	t.Parallel()
-	clients := test.Setup(t)
+// // TestPercentage verifies that an Ingress splitting over multiple backends respects
+// // the given percentage distribution.
+// func TestPercentage(t *testing.T) {
+// 	t.Parallel()
+// 	clients := test.Setup(t)
 
-	// Use a post-split injected header to establish which split we are sending traffic to.
-	const headerName = "Foo-Bar-Baz"
+// 	// Use a post-split injected header to establish which split we are sending traffic to.
+// 	const headerName = "Foo-Bar-Baz"
 
-	backends := make([]v1alpha1.IngressBackendSplit, 0, 10)
-	weights := make(map[string]float64, len(backends))
+// 	backends := make([]v1alpha1.IngressBackendSplit, 0, 10)
+// 	weights := make(map[string]float64, len(backends))
 
-	// Double the percentage of the split each iteration until it would overflow, and then
-	// give the last route the remainder.
-	percent, total := 1, 0
-	for i := 0; i < 10; i++ {
-		name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-		defer cancel()
-		backends = append(backends, v1alpha1.IngressBackendSplit{
-			IngressBackend: v1alpha1.IngressBackend{
-				ServiceName:      name,
-				ServiceNamespace: test.ServingNamespace,
-				ServicePort:      intstr.FromInt(port),
-			},
-			// Append different headers to each split, which lets us identify
-			// which backend we hit.
-			AppendHeaders: map[string]string{
-				headerName: name,
-			},
-			Percent: percent,
-		})
-		weights[name] = float64(percent)
+// 	// Double the percentage of the split each iteration until it would overflow, and then
+// 	// give the last route the remainder.
+// 	percent, total := 1, 0
+// 	for i := 0; i < 10; i++ {
+// 		name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+// 		defer cancel()
+// 		backends = append(backends, v1alpha1.IngressBackendSplit{
+// 			IngressBackend: v1alpha1.IngressBackend{
+// 				ServiceName:      name,
+// 				ServiceNamespace: test.ServingNamespace,
+// 				ServicePort:      intstr.FromInt(port),
+// 			},
+// 			// Append different headers to each split, which lets us identify
+// 			// which backend we hit.
+// 			AppendHeaders: map[string]string{
+// 				headerName: name,
+// 			},
+// 			Percent: percent,
+// 		})
+// 		weights[name] = float64(percent)
 
-		total += percent
-		percent *= 2
-		// Cap the final non-zero bucket so that we total 100%
-		// After that, this will zero out remaining buckets.
-		if total+percent > 100 {
-			percent = 100 - total
-		}
-	}
+// 		total += percent
+// 		percent *= 2
+// 		// Cap the final non-zero bucket so that we total 100%
+// 		// After that, this will zero out remaining buckets.
+// 		if total+percent > 100 {
+// 			percent = 100 - total
+// 		}
+// 	}
 
-	// Create a simple Ingress over the 10 Services.
-	name := test.ObjectNameForTest(t)
-	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
-		Rules: []v1alpha1.IngressRule{{
-			Hosts:      []string{name + ".example.com"},
-			Visibility: v1alpha1.IngressVisibilityExternalIP,
-			HTTP: &v1alpha1.HTTPIngressRuleValue{
-				Paths: []v1alpha1.HTTPIngressPath{{
-					Splits: backends,
-				}},
-			},
-		}},
-	})
-	defer cancel()
+// 	// Create a simple Ingress over the 10 Services.
+// 	name := test.ObjectNameForTest(t)
+// 	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
+// 		Rules: []v1alpha1.IngressRule{{
+// 			Hosts:      []string{name + ".example.com"},
+// 			Visibility: v1alpha1.IngressVisibilityExternalIP,
+// 			HTTP: &v1alpha1.HTTPIngressRuleValue{
+// 				Paths: []v1alpha1.HTTPIngressPath{{
+// 					Splits: backends,
+// 				}},
+// 			},
+// 		}},
+// 	})
+// 	defer cancel()
 
-	// Create a large enough population of requests that we can reasonably assess how
-	// well the Ingress respected the percentage split.
-	seen := make(map[string]float64, len(backends))
+// 	// Create a large enough population of requests that we can reasonably assess how
+// 	// well the Ingress respected the percentage split.
+// 	seen := make(map[string]float64, len(backends))
 
-	const (
-		// The total number of requests to make (as a float to avoid conversions in later computations).
-		totalRequests = 1000.0
-		// The increment to make for each request, so that the values of seen reflect the
-		// percentage of the total number of requests we are making.
-		increment = 100.0 / totalRequests
-		// Allow the Ingress to be within 10% of the configured value.
-		margin = 10.0
-	)
-	wg := pool.New(8)
-	resultCh := make(chan string, totalRequests)
+// 	const (
+// 		// The total number of requests to make (as a float to avoid conversions in later computations).
+// 		totalRequests = 1000.0
+// 		// The increment to make for each request, so that the values of seen reflect the
+// 		// percentage of the total number of requests we are making.
+// 		increment = 100.0 / totalRequests
+// 		// Allow the Ingress to be within 10% of the configured value.
+// 		margin = 10.0
+// 	)
+// 	wg := pool.New(8)
+// 	resultCh := make(chan string, totalRequests)
 
-	for i := 0.0; i < totalRequests; i++ {
-		wg.Go(func() error {
-			ri := RuntimeRequest(t, client, "http://"+name+".example.com")
-			if ri == nil {
-				return errors.New("failed to request")
-			}
-			resultCh <- ri.Request.Headers.Get(headerName)
-			return nil
-		})
-	}
-	if err := wg.Wait(); err != nil {
-		t.Errorf("Error while sending requests: %v", err)
-	}
-	close(resultCh)
+// 	for i := 0.0; i < totalRequests; i++ {
+// 		wg.Go(func() error {
+// 			ri := RuntimeRequest(t, client, "http://"+name+".example.com")
+// 			if ri == nil {
+// 				return errors.New("failed to request")
+// 			}
+// 			resultCh <- ri.Request.Headers.Get(headerName)
+// 			return nil
+// 		})
+// 	}
+// 	if err := wg.Wait(); err != nil {
+// 		t.Errorf("Error while sending requests: %v", err)
+// 	}
+// 	close(resultCh)
 
-	for r := range resultCh {
-		seen[r] += increment
-	}
+// 	for r := range resultCh {
+// 		seen[r] += increment
+// 	}
 
-	for name, want := range weights {
-		got := seen[name]
-		switch {
-		case want == 0.0 && got > 0.0:
-			// For 0% targets, we have tighter requirements.
-			t.Errorf("Target %q received traffic, wanted none (0%% target).", name)
-		case math.Abs(got-want) > margin:
-			t.Errorf("Target %q received %f%%, wanted %f +/- %f", name, got, want, margin)
-		}
-	}
-}
+// 	for name, want := range weights {
+// 		got := seen[name]
+// 		switch {
+// 		case want == 0.0 && got > 0.0:
+// 			// For 0% targets, we have tighter requirements.
+// 			t.Errorf("Target %q received traffic, wanted none (0%% target).", name)
+// 		case math.Abs(got-want) > margin:
+// 			t.Errorf("Target %q received %f%%, wanted %f +/- %f", name, got, want, margin)
+// 		}
+// 	}
+// }

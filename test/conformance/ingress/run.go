@@ -18,17 +18,28 @@ package ingress
 
 import (
 	"flag"
-	"knative.dev/pkg/test/v2"
 	"testing"
+	"time"
+
+	netclientset "knative.dev/networking/pkg/client/clientset/versioned"
+	networkingv1alpha1 "knative.dev/networking/pkg/client/clientset/versioned/typed/networking/v1alpha1"
+	"knative.dev/pkg/test/v2"
+	servingtest "knative.dev/serving/test"
 )
 
 type Conformance struct {
 	test.BaseConfig
+
 	IngressClass string
+
+	PollInterval time.Duration
+	PollTimeout  time.Duration
+
+	IngressClient networkingv1alpha1.IngressInterface
 }
 
 func (c *Conformance) AddFlags(fs *flag.FlagSet) {
-	c.Context.AddFlags(fs)
+	c.BaseConfig.AddFlags(fs)
 
 	flag.StringVar(&c.IngressClass,
 		"ingress.class",
@@ -36,40 +47,65 @@ func (c *Conformance) AddFlags(fs *flag.FlagSet) {
 		"Set this flag to the ingress class to test against.")
 }
 
+func (c *Conformance) ResetClients() {
+	c.BaseConfig.ResetClients()
+
+	cs := netclientset.NewForConfigOrDie(c.Environment().ClientConfig())
+	c.IngressClient = cs.NetworkingV1alpha1().Ingresses(c.Environment().Namespace)
+}
+
+func DefaultConfig() Conformance {
+	c := Conformance{}
+	c.Namespace = servingtest.ServingNamespace
+	c.PollInterval = servingtest.PollInterval
+	c.PollInterval = servingtest.PollTimeout
+	return c
+}
+
+func Config(t *test.T) *Conformance {
+	return t.Config.(*Conformance)
+}
+
 // RunConformance will run ingress conformance tests
 //
 // Depending on the options it may test alpha and beta features
 func RunConformance(tt *testing.T, c *Conformance) {
-	t := test.NewContext(t, c)
+	t := test.NewContext(tt, c)
 
 	t.Stable("basics", TestBasics)
-	t.Stable("basics/http2", TestBasicsHTTP2)
+	t.Beta("beta feature", func(t *test.T) {
+		t.Errorf("fail")
+	})
 
-	t.Stable("grpc", TestGRPC)
-	t.Stable("grpc/split", TestGRPCSplit)
+	// This is stable but just demonstrating
+	// usage
+	t.Alpha("basics/http2", TestBasicsHTTP2)
 
-	t.Stable("headers/pre-split", TestPreSplitSetHeaders)
-	t.Stable("headers/post-split", TestPostSplitSetHeaders)
+	// t.Stable("grpc", TestGRPC)
+	// t.Stable("grpc/split", TestGRPCSplit)
 
-	t.Stable("hosts/multiple", TestMultipleHosts)
+	// t.Stable("headers/pre-split", TestPreSplitSetHeaders)
+	// t.Stable("headers/post-split", TestPostSplitSetHeaders)
 
-	t.Stable("dispatch/path", TestPath)
-	t.Stable("dispatch/percentage", TestPercentage)
-	t.Stable("dispatch/path_and_percentage", TestPathAndPercentageSplit)
+	// t.Stable("hosts/multiple", TestMultipleHosts)
 
-	t.Stable("retry", TestRetry)
-	t.Stable("timeout", TestTimeout)
+	// t.Stable("dispatch/path", TestPath)
+	// t.Stable("dispatch/percentage", TestPercentage)
+	// t.Stable("dispatch/path_and_percentage", TestPathAndPercentageSplit)
 
-	t.Stable("tls", TestIngressTLS)
-	t.Stable("update", TestUpdate)
+	// t.Stable("retry", TestRetry)
+	// t.Stable("timeout", TestTimeout)
 
-	t.Stable("visibility", TestVisibility)
-	t.Stable("visibility/split", TestVisibilitySplit)
-	t.Stable("visibility/path", TestVisibilityPath)
+	// t.Stable("tls", TestIngressTLS)
+	// t.Stable("update", TestUpdate)
 
-	t.Stable("websocket", TestWebsocket)
-	t.Stable("websocket/split", TestWebsocketSplit)
+	// t.Stable("visibility", TestVisibility)
+	// t.Stable("visibility/split", TestVisibilitySplit)
+	// t.Stable("visibility/path", TestVisibilityPath)
 
-	// Add your conformance test for alpha features
-	t.Alpha("headers/tags", TestTagHeaders)
+	// t.Stable("websocket", TestWebsocket)
+	// t.Stable("websocket/split", TestWebsocketSplit)
+
+	// // Add your conformance test for alpha features
+	// t.Alpha("headers/tags", TestTagHeaders)
 }

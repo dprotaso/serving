@@ -16,53 +16,53 @@ limitations under the License.
 
 package ingress
 
-import (
-	"testing"
+// import (
+// 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"knative.dev/networking/pkg/apis/networking"
-	"knative.dev/networking/pkg/apis/networking/v1alpha1"
-	"knative.dev/serving/test"
-)
+// 	"k8s.io/apimachinery/pkg/util/intstr"
+// 	"knative.dev/networking/pkg/apis/networking"
+// 	"knative.dev/networking/pkg/apis/networking/v1alpha1"
+// 	"knative.dev/serving/test"
+// )
 
-// TestMultipleHosts verifies that an Ingress can respond to multiple hosts.
-func TestMultipleHosts(t *testing.T) {
-	t.Parallel()
-	clients := test.Setup(t)
-
-	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
-	defer cancel()
-
-	// TODO(mattmoor): Once .svc.cluster.local stops being a special case
-	// for Visibility, add it here.
-	hosts := []string{
-		"foo.com",
-		"www.foo.com",
-		"a-b-1.something-really-really-long.knative.dev",
-		"add.your.interesting.domain.here.io",
-	}
-
-	// Create a simple Ingress over the Service.
-	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
-		Rules: []v1alpha1.IngressRule{{
-			Hosts:      hosts,
-			Visibility: v1alpha1.IngressVisibilityExternalIP,
-			HTTP: &v1alpha1.HTTPIngressRuleValue{
-				Paths: []v1alpha1.HTTPIngressPath{{
-					Splits: []v1alpha1.IngressBackendSplit{{
-						IngressBackend: v1alpha1.IngressBackend{
-							ServiceName:      name,
-							ServiceNamespace: test.ServingNamespace,
-							ServicePort:      intstr.FromInt(port),
-						},
-					}},
-				}},
-			},
-		}},
-	})
-	defer cancel()
-
-	for _, host := range hosts {
-		RuntimeRequest(t, client, "http://"+host)
-	}
-}
+//// TestMultipleHosts verifies that an Ingress can respond to multiple hosts.
+//func TestMultipleHosts(t *testing.T) {
+//	t.Parallel()
+//	clients := test.Setup(t)
+//
+//	name, port, cancel := CreateRuntimeService(t, clients, networking.ServicePortNameHTTP1)
+//	defer cancel()
+//
+//	// TODO(mattmoor): Once .svc.cluster.local stops being a special case
+//	// for Visibility, add it here.
+//	hosts := []string{
+//		"foo.com",
+//		"www.foo.com",
+//		"a-b-1.something-really-really-long.knative.dev",
+//		"add.your.interesting.domain.here.io",
+//	}
+//
+//	// Create a simple Ingress over the Service.
+//	_, client, cancel := CreateIngressReady(t, clients, v1alpha1.IngressSpec{
+//		Rules: []v1alpha1.IngressRule{{
+//			Hosts:      hosts,
+//			Visibility: v1alpha1.IngressVisibilityExternalIP,
+//			HTTP: &v1alpha1.HTTPIngressRuleValue{
+//				Paths: []v1alpha1.HTTPIngressPath{{
+//					Splits: []v1alpha1.IngressBackendSplit{{
+//						IngressBackend: v1alpha1.IngressBackend{
+//							ServiceName:      name,
+//							ServiceNamespace: test.ServingNamespace,
+//							ServicePort:      intstr.FromInt(port),
+//						},
+//					}},
+//				}},
+//			},
+//		}},
+//	})
+//	defer cancel()
+//
+//	for _, host := range hosts {
+//		RuntimeRequest(t, client, "http://"+host)
+//	}
+//}
