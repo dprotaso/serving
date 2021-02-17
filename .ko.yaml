@@ -2,3 +2,4 @@
 defaultBaseImage: gcr.io/distroless/static:nonroot
 baseImageOverrides:
   knative.dev/serving/vendor/github.com/tsenart/vegeta/v12: ubuntu:latest
+  knative.dev/serving/cmd/queue: gcr.io/cf-elafros-dog/dave/probe-8f638664b45084083248222e2739e4d6@sha256:3e39659a10388e98f601bae6f157b4a268e448a80e1ddad68bb39c26748a8512

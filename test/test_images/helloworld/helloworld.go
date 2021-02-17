@@ -22,10 +22,19 @@ import (
 	"log"
 	"net/http"
 
+	"go.uber.org/atomic"
 	"knative.dev/serving/test"
 )
 
+var probed atomic.Int32
+
 func handler(w http.ResponseWriter, r *http.Request) {
+	if probed.Load() <= 3 {
+		probed.Inc()
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	log.Print("Hello world received a request.")
 	fmt.Fprintln(w, "Hello World! How about some tasty noodles?")
 }

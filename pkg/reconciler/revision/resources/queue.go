@@ -176,7 +176,7 @@ func makeQueueProbe(in *corev1.Probe) *corev1.Probe {
 		out := &corev1.Probe{
 			Handler: corev1.Handler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"/ko-app/queue", "-probe-period", "0"},
+					Command: []string{"/ko-app/probe", "0"},
 				},
 			},
 			// The exec probe enables us to retry failed probes quickly to get sub-second
@@ -212,7 +212,7 @@ func makeQueueProbe(in *corev1.Probe) *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
 			Exec: &corev1.ExecAction{
-				Command: []string{"/ko-app/queue", "-probe-period", timeout.String()},
+				Command: []string{"/ko-app/probe", timeout.String()},
 			},
 		},
 		PeriodSeconds:       in.PeriodSeconds,
