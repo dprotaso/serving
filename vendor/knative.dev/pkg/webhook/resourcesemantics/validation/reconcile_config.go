@@ -116,6 +116,23 @@ func (ac *reconciler) reconcileValidatingWebhook(ctx context.Context, caCert []b
 		})
 	}
 
+	for gvk := range ac.callbacks {
+		plural := strings.ToLower(flect.Pluralize(gvk.Kind))
+
+		rules = append(rules, admissionregistrationv1.RuleWithOperations{
+			Operations: []admissionregistrationv1.OperationType{
+				admissionregistrationv1.Create,
+				admissionregistrationv1.Update,
+				admissionregistrationv1.Delete,
+			},
+			Rule: admissionregistrationv1.Rule{
+				APIGroups:   []string{gvk.Group},
+				APIVersions: []string{gvk.Version},
+				Resources:   []string{plural, plural + "/status"},
+			},
+		})
+	}
+
 	// Sort the rules by Group, Version, Kind so that things are deterministically ordered.
 	sort.Slice(rules, func(i, j int) bool {
 		lhs, rhs := rules[i], rules[j]

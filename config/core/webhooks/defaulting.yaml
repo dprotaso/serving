@@ -28,3 +28,20 @@ webhooks:
   sideEffects: None
   name: webhook.serving.knative.dev
   timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: always.pull.webhook.serving.knative.dev
+  labels:
+    serving.knative.dev/release: devel
+webhooks:
+- admissionReviewVersions: ["v1", "v1beta1"]
+  clientConfig:
+    service:
+      name: always-pull-webhook
+      namespace: knative-serving
+  failurePolicy: Fail
+  sideEffects: None
+  name: always.pull.webhook.serving.knative.dev
+  timeoutSeconds: 10

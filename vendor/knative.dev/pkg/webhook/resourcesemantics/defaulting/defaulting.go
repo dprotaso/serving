@@ -31,6 +31,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -56,9 +57,10 @@ type reconciler struct {
 	webhook.StatelessAdmissionImpl
 	pkgreconciler.LeaderAwareFuncs
 
-	key      types.NamespacedName
-	path     string
-	handlers map[schema.GroupVersionKind]resourcesemantics.GenericCRD
+	key       types.NamespacedName
+	path      string
+	handlers  map[schema.GroupVersionKind]resourcesemantics.GenericCRD
+	callbacks map[schema.GroupVersionKind]Callback
 
 	withContext func(context.Context) context.Context
 
@@ -118,6 +120,10 @@ func (ac *reconciler) Admit(ctx context.Context, request *admissionv1.AdmissionR
 	}
 
 	patchBytes, err := ac.mutate(ctx, request)
+	if err != nil && strings.Contains(err.Error(), "unhandled kind") {
+		patchBytes, err = ac.mutateUnstructured(ctx, request)
+	}
+
 	if err != nil {
 		return webhook.MakeErrorStatus("mutation failed: %v", err)
 	}
@@ -138,6 +144,21 @@ func (ac *reconciler) reconcileMutatingWebhook(ctx context.Context, caCert []byt
 
 	rules := make([]admissionregistrationv1.RuleWithOperations, 0, len(ac.handlers))
 	for gvk := range ac.handlers {
+		plural := strings.ToLower(flect.Pluralize(gvk.Kind))
+
+		rules = append(rules, admissionregistrationv1.RuleWithOperations{
+			Operations: []admissionregistrationv1.OperationType{
+				admissionregistrationv1.Create,
+				admissionregistrationv1.Update,
+			},
+			Rule: admissionregistrationv1.Rule{
+				APIGroups:   []string{gvk.Group},
+				APIVersions: []string{gvk.Version},
+				Resources:   []string{plural, plural + "/status"},
+			},
+		})
+	}
+	for gvk := range ac.callbacks {
 		plural := strings.ToLower(flect.Pluralize(gvk.Kind))
 
 		rules = append(rules, admissionregistrationv1.RuleWithOperations{
@@ -212,6 +233,55 @@ func (ac *reconciler) reconcileMutatingWebhook(ctx context.Context, caCert []byt
 		logger.Info("Webhook is valid")
 	}
 	return nil
+}
+
+func (ac *reconciler) mutateUnstructured(ctx context.Context, req *admissionv1.AdmissionRequest) ([]byte, error) {
+
+	kind := req.Kind
+	gvk := schema.GroupVersionKind{
+		Group:   kind.Group,
+		Version: kind.Version,
+		Kind:    kind.Kind,
+	}
+
+	var toDecode []byte
+	if req.Operation == admissionv1.Delete {
+		toDecode = req.OldObject.Raw
+	} else {
+		toDecode = req.Object.Raw
+	}
+
+	if toDecode == nil {
+		return nil, fmt.Errorf("No incoming object found: %v for verb %v", gvk, req.Operation)
+	}
+
+	// Generically callback if any are provided for the resource.
+	var c Callback
+	var ok bool
+
+	if c, ok = ac.callbacks[gvk]; !ok {
+		return nil, fmt.Errorf("unhandled")
+	}
+
+	if _, supported := c.supportedVerbs[req.Operation]; !supported {
+		return nil, fmt.Errorf("unsupported")
+	}
+
+	orig := &unstructured.Unstructured{}
+	newDecoder := json.NewDecoder(bytes.NewBuffer(toDecode))
+	if err := newDecoder.Decode(&orig); err != nil {
+		return nil, fmt.Errorf("cannot decode incoming new object: %w", err)
+	}
+
+	mutated := orig.DeepCopyObject().(*unstructured.Unstructured)
+
+	c.function(ctx, mutated)
+	patch, err := duck.CreatePatch(orig, mutated)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(patch)
 }
 
 func (ac *reconciler) mutate(ctx context.Context, req *admissionv1.AdmissionRequest) ([]byte, error) {

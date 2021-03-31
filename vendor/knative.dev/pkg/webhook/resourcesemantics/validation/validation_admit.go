@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -74,12 +75,16 @@ func (ac *reconciler) Admit(ctx context.Context, request *admissionv1.AdmissionR
 	}
 
 	ctx, resource, err := ac.decodeRequestAndPrepareContext(ctx, request, gvk)
-	if err != nil {
-		return webhook.MakeErrorStatus("decoding request failed: %v", err)
+	if err == nil {
+		if err := validate(ctx, resource, request); err != nil {
+			return webhook.MakeErrorStatus("validation failed: %v", err)
+		}
 	}
 
-	if err := validate(ctx, resource, request); err != nil {
-		return webhook.MakeErrorStatus("validation failed: %v", err)
+	if err != nil {
+		if !strings.Contains(err.Error(), "unhandled") {
+			return webhook.MakeErrorStatus("decoding request failed: %v", err)
+		}
 	}
 
 	if err := ac.callback(ctx, request, gvk); err != nil {
