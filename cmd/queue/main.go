@@ -33,8 +33,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	"knative.dev/networking/pkg/buffer"
-	"knative.dev/networking/pkg/header"
+	"knative.dev/networking/pkg/httpproxy"
 	proberhandler "knative.dev/networking/pkg/prober/handler"
 	"knative.dev/networking/pkg/stats"
 	"knative.dev/pkg/logging/logkey"
@@ -281,8 +280,8 @@ func buildServer(ctx context.Context, env config, healthState *health.State, rp 
 	httpProxy := pkghttp.NewHeaderPruningReverseProxy(target, pkghttp.NoHostOverride, activator.RevisionHeaders)
 	httpProxy.Transport = buildTransport(env, logger, maxIdleConns)
 	httpProxy.ErrorHandler = pkgnet.ErrorHandler(logger)
-	httpProxy.BufferPool = buffer.NewPool()
-	httpProxy.FlushInterval = header.FlushInterval
+	httpProxy.BufferPool = httpproxy.NewBufferPool()
+	httpProxy.FlushInterval = httpproxy.FlushInterval
 
 	breaker := buildBreaker(logger, env)
 	// metricsSupported := supportsMetrics(ctx, logger, env)

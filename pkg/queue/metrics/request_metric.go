@@ -208,7 +208,7 @@ const (
 
 // GetRouteTagNameFromRequest extracts the value of the tag header from http.Request
 func GetRouteTagNameFromRequest(r *http.Request) string {
-	name := r.Header.Get(header.TagKey)
+	name := r.Header.Get(header.RouteTagKey)
 	isDefaultRoute := r.Header.Get(header.DefaultRouteKey)
 
 	if name == "" {

@@ -88,7 +88,7 @@ func TestRequestMetricsHandlerWithEnablingTagOnRequestMetrics(t *testing.T) {
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, targetURI, bytes.NewBufferString("test"))
-	req.Header.Set(header.TagKey, "test-tag")
+	req.Header.Set(header.RouteTagKey, "test-tag")
 
 	handler.ServeHTTP(resp, req)
 
@@ -114,7 +114,7 @@ func TestRequestMetricsHandlerWithEnablingTagOnRequestMetrics(t *testing.T) {
 	// Testing for default route
 	reset()
 	handler, _ = NewRequestMetricsHandler(baseHandler, "ns", "svc", "cfg", "rev", "pod")
-	req.Header.Del(header.TagKey)
+	req.Header.Del(header.RouteTagKey)
 	req.Header.Set(header.DefaultRouteKey, "true")
 	handler.ServeHTTP(resp, req)
 	wantTags["route_tag"] = defaultTagName
@@ -122,7 +122,7 @@ func TestRequestMetricsHandlerWithEnablingTagOnRequestMetrics(t *testing.T) {
 
 	reset()
 	handler, _ = NewRequestMetricsHandler(baseHandler, "ns", "svc", "cfg", "rev", "pod")
-	req.Header.Set(header.TagKey, "test-tag")
+	req.Header.Set(header.RouteTagKey, "test-tag")
 	req.Header.Set(header.DefaultRouteKey, "true")
 	handler.ServeHTTP(resp, req)
 	wantTags["route_tag"] = undefinedTagName
@@ -130,7 +130,7 @@ func TestRequestMetricsHandlerWithEnablingTagOnRequestMetrics(t *testing.T) {
 
 	reset()
 	handler, _ = NewRequestMetricsHandler(baseHandler, "ns", "svc", "cfg", "rev", "pod")
-	req.Header.Set(header.TagKey, "test-tag")
+	req.Header.Set(header.RouteTagKey, "test-tag")
 	req.Header.Set(header.DefaultRouteKey, "false")
 	handler.ServeHTTP(resp, req)
 	wantTags["route_tag"] = "test-tag"
