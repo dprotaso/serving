@@ -21,7 +21,7 @@ import (
 
 	"go.uber.org/atomic"
 	"knative.dev/pkg/configmap"
-	tracingconfig "knative.dev/pkg/tracing/config"
+	tracingconfig "knative.dev/pkg/tracing/config/configmap"
 )
 
 type cfgKey struct{}

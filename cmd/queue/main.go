@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"go.opencensus.io/plugin/ochttp"
 	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
 
@@ -37,8 +38,12 @@ import (
 	proberhandler "knative.dev/networking/pkg/prober/handler"
 	"knative.dev/networking/pkg/stats"
 	"knative.dev/pkg/logging/logkey"
+	"knative.dev/pkg/metrics"
 	pkgnet "knative.dev/pkg/network"
 	"knative.dev/pkg/signals"
+	"knative.dev/pkg/tracing"
+	tracingconfig "knative.dev/pkg/tracing/config"
+	"knative.dev/pkg/tracing/propagation/tracecontextb3"
 	"knative.dev/serving/pkg/activator"
 	pkghttp "knative.dev/serving/pkg/http"
 	"knative.dev/serving/pkg/http/handler"
@@ -93,10 +98,10 @@ type config struct {
 	MetricsCollectorAddress      string `split_words:"true"` // optional
 
 	// Tracing configuration
-	TracingConfigDebug bool `split_words:"true"` // optional
-	// TracingConfigBackend        tracingconfig.BackendType `split_words:"true"` // optional
-	TracingConfigSampleRate     float64 `split_words:"true"` // optional
-	TracingConfigZipkinEndpoint string  `split_words:"true"` // optional
+	TracingConfigDebug          bool                      `split_words:"true"` // optional
+	TracingConfigBackend        tracingconfig.BackendType `split_words:"true"` // optional
+	TracingConfigSampleRate     float64                   `split_words:"true"` // optional
+	TracingConfigZipkinEndpoint string                    `split_words:"true"` // optional
 }
 
 func init() {
@@ -142,7 +147,7 @@ func main() {
 		zap.String(logkey.Pod, env.ServingPod))
 
 	// Report stats on Go memory usage every 30 seconds.
-	// metrics.MemStatsOrDie(ctx)
+	metrics.MemStatsOrDie(ctx)
 
 	// Setup reporters and processes to handle stat reporting.
 	promStatReporter, err := queue.NewPrometheusStatsReporter(
@@ -284,27 +289,26 @@ func buildServer(ctx context.Context, env config, healthState *health.State, rp 
 	httpProxy.FlushInterval = httpproxy.FlushInterval
 
 	breaker := buildBreaker(logger, env)
-	// metricsSupported := supportsMetrics(ctx, logger, env)
-	// tracingEnabled := env.TracingConfigBackend != tracingconfig.None
-	tracingEnabled := false
+	metricsSupported := supportsMetrics(ctx, logger, env)
+	tracingEnabled := env.TracingConfigBackend != tracingconfig.None
 	timeout := time.Duration(env.RevisionTimeoutSeconds) * time.Second
 
 	// Create queue handler chain.
 	// Note: innermost handlers are specified first, ie. the last handler in the chain will be executed first.
 	var composedHandler http.Handler = httpProxy
-	// if metricsSupported {
-	// 	composedHandler = requestAppMetricsHandler(logger, composedHandler, breaker, env)
-	// }
+	if metricsSupported {
+		composedHandler = requestAppMetricsHandler(logger, composedHandler, breaker, env)
+	}
 	composedHandler = queue.ProxyHandler(breaker, stats, tracingEnabled, composedHandler)
 	composedHandler = queue.ForwardedShimHandler(composedHandler)
 	composedHandler = handler.NewTimeToFirstByteTimeoutHandler(composedHandler, "request timeout", timeout)
 
-	// if metricsSupported {
-	// 	composedHandler = requestMetricsHandler(logger, composedHandler, env)
-	// }
-	// if tracingEnabled {
-	// 	composedHandler = tracing.HTTPSpanMiddleware(composedHandler)
-	// }
+	if metricsSupported {
+		composedHandler = requestMetricsHandler(logger, composedHandler, env)
+	}
+	if tracingEnabled {
+		composedHandler = tracing.HTTPSpanMiddleware(composedHandler)
+	}
 
 	composedHandler = health.ProbeHandler(healthState, rp.ProbeContainer, rp.IsAggressive(), tracingEnabled, composedHandler)
 	composedHandler = proberhandler.New(composedHandler)
@@ -319,23 +323,22 @@ func buildTransport(env config, logger *zap.SugaredLogger, maxConns int) http.Ro
 	// set max-idle and max-idle-per-host to same value since we're always proxying to the same host.
 	transport := pkgnet.NewProxyAutoTransport(maxConns /* max-idle */, maxConns /* max-idle-per-host */)
 
-	// if env.TracingConfigBackend == tracingconfig.None {
-	// 	return transport
-	// }
+	if env.TracingConfigBackend == tracingconfig.None {
+		return transport
+	}
 
-	// oct := tracing.NewOpenCensusTracer(tracing.WithExporterFull(env.ServingPod, env.ServingPodIP, logger))
-	// oct.ApplyConfig(&tracingconfig.Config{
-	// 	Backend:        env.TracingConfigBackend,
-	// 	Debug:          env.TracingConfigDebug,
-	// 	ZipkinEndpoint: env.TracingConfigZipkinEndpoint,
-	// 	SampleRate:     env.TracingConfigSampleRate,
-	// })
+	oct := tracing.NewOpenCensusTracer(tracing.WithExporterFull(env.ServingPod, env.ServingPodIP, logger))
+	oct.ApplyConfig(&tracingconfig.Config{
+		Backend:        env.TracingConfigBackend,
+		Debug:          env.TracingConfigDebug,
+		ZipkinEndpoint: env.TracingConfigZipkinEndpoint,
+		SampleRate:     env.TracingConfigSampleRate,
+	})
 
-	// return &ochttp.Transport{
-	// 	Base:        transport,
-	// 	Propagation: tracecontextb3.TraceContextB3Egress,
-	// }
-	return transport
+	return &ochttp.Transport{
+		Base:        transport,
+		Propagation: tracecontextb3.TraceContextB3Egress,
+	}
 }
 
 func buildBreaker(logger *zap.SugaredLogger, env config) *queue.Breaker {
@@ -414,25 +417,25 @@ func pushRequestLogHandler(logger *zap.SugaredLogger, currentHandler http.Handle
 	return handler
 }
 
-// func requestMetricsHandler(logger *zap.SugaredLogger, currentHandler http.Handler, env config) http.Handler {
-// 	h, err := queue.NewRequestMetricsHandler(currentHandler, env.ServingNamespace,
-// 		env.ServingService, env.ServingConfiguration, env.ServingRevision, env.ServingPod)
-// 	if err != nil {
-// 		logger.Errorw("Error setting up request metrics reporter. Request metrics will be unavailable.", zap.Error(err))
-// 		return currentHandler
-// 	}
-// 	return h
-// }
+func requestMetricsHandler(logger *zap.SugaredLogger, currentHandler http.Handler, env config) http.Handler {
+	h, err := queue.NewRequestMetricsHandler(currentHandler, env.ServingNamespace,
+		env.ServingService, env.ServingConfiguration, env.ServingRevision, env.ServingPod)
+	if err != nil {
+		logger.Errorw("Error setting up request metrics reporter. Request metrics will be unavailable.", zap.Error(err))
+		return currentHandler
+	}
+	return h
+}
 
-// func requestAppMetricsHandler(logger *zap.SugaredLogger, currentHandler http.Handler, breaker *queue.Breaker, env config) http.Handler {
-// 	h, err := queue.NewAppRequestMetricsHandler(currentHandler, breaker, env.ServingNamespace,
-// 		env.ServingService, env.ServingConfiguration, env.ServingRevision, env.ServingPod)
-// 	if err != nil {
-// 		logger.Errorw("Error setting up app request metrics reporter. Request metrics will be unavailable.", zap.Error(err))
-// 		return currentHandler
-// 	}
-// 	return h
-// }
+func requestAppMetricsHandler(logger *zap.SugaredLogger, currentHandler http.Handler, breaker *queue.Breaker, env config) http.Handler {
+	h, err := queue.NewAppRequestMetricsHandler(currentHandler, breaker, env.ServingNamespace,
+		env.ServingService, env.ServingConfiguration, env.ServingRevision, env.ServingPod)
+	if err != nil {
+		logger.Errorw("Error setting up app request metrics reporter. Request metrics will be unavailable.", zap.Error(err))
+		return currentHandler
+	}
+	return h
+}
 
 func setupMetricsExporter(ctx context.Context, logger *zap.SugaredLogger, backend string, collectorAddress string) error {
 	// Set up OpenCensus exporter.
@@ -441,22 +444,21 @@ func setupMetricsExporter(ctx context.Context, logger *zap.SugaredLogger, backen
 	// revision is reasonable.
 	// TODO(yanweiguo): add the ability to emit metrics with names not combined
 	// to component.
-	// ops := metrics.ExporterOptions{
-	// 	Domain:         metrics.Domain(),
-	// 	Component:      "revision",
-	// 	PrometheusPort: networking.UserQueueMetricsPort,
-	// 	ConfigMap: map[string]string{
-	// 		metrics.BackendDestinationKey: backend,
-	// 		"metrics.opencensus-address":  collectorAddress,
-	// 	},
-	// }
-	// return metrics.UpdateExporter(ctx, ops, logger)
-	return nil
+	ops := metrics.ExporterOptions{
+		Domain:         metrics.Domain(),
+		Component:      "revision",
+		PrometheusPort: networking.UserQueueMetricsPort,
+		ConfigMap: map[string]string{
+			metrics.BackendDestinationKey: backend,
+			"metrics.opencensus-address":  collectorAddress,
+		},
+	}
+	return metrics.UpdateExporter(ctx, ops, logger)
 }
 
 func flush(logger *zap.SugaredLogger) {
 	logger.Sync()
 	os.Stdout.Sync()
 	os.Stderr.Sync()
-	// metrics.FlushExporter()
+	metrics.FlushExporter()
 }

@@ -15,7 +15,11 @@ limitations under the License.
 */
 package health
 
-import "k8s.io/apimachinery/pkg/util/intstr"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+)
 
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
@@ -31,7 +35,7 @@ type TCPSocketAction struct {
 	// Number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
-	Port intstr.IntOrString `json:"port" protobuf:"bytes,1,opt,name=port"`
+	Port IntOrString `json:"port" protobuf:"bytes,1,opt,name=port"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	// +optional
 	Host string `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
@@ -88,7 +92,7 @@ type HTTPGetAction struct {
 	// Name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
-	Port intstr.IntOrString `json:"port" protobuf:"bytes,2,opt,name=port"`
+	Port IntOrString `json:"port" protobuf:"bytes,2,opt,name=port"`
 	// Host name to connect to, defaults to the pod IP. You probably want to set
 	// "Host" in httpHeaders instead.
 	// +optional
@@ -118,4 +122,71 @@ type HTTPHeader struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// The header field value
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
+}
+
+// IntOrString is a type that can hold an int32 or a string.  When used in
+// JSON or YAML marshalling and unmarshalling, it produces or consumes the
+// inner type.  This allows you to have, for example, a JSON field that can
+// accept a name or number.
+// TODO: Rename to Int32OrString
+//
+// +protobuf=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:openapi-gen=true
+type IntOrString struct {
+	Type   Type   `protobuf:"varint,1,opt,name=type,casttype=Type"`
+	IntVal int32  `protobuf:"varint,2,opt,name=intVal"`
+	StrVal string `protobuf:"bytes,3,opt,name=strVal"`
+}
+
+// Type represents the stored type of IntOrString.
+type Type int64
+
+const (
+	Int    Type = iota // The IntOrString holds an int.
+	String             // The IntOrString holds a string.
+)
+
+// UnmarshalJSON implements the json.Unmarshaller interface.
+func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
+	if value[0] == '"' {
+		intstr.Type = String
+		return json.Unmarshal(value, &intstr.StrVal)
+	}
+	intstr.Type = Int
+	return json.Unmarshal(value, &intstr.IntVal)
+}
+
+// String returns the string value, or the Itoa of the int value.
+func (intstr *IntOrString) String() string {
+	if intstr == nil {
+		return "<nil>"
+	}
+	if intstr.Type == String {
+		return intstr.StrVal
+	}
+	return strconv.Itoa(intstr.IntValue())
+}
+
+// IntValue returns the IntVal if type Int, or if
+// it is a String, will attempt a conversion to int,
+// returning 0 if a parsing error occurs.
+func (intstr *IntOrString) IntValue() int {
+	if intstr.Type == String {
+		i, _ := strconv.Atoi(intstr.StrVal)
+		return i
+	}
+	return int(intstr.IntVal)
+}
+
+// MarshalJSON implements the json.Marshaller interface.
+func (intstr IntOrString) MarshalJSON() ([]byte, error) {
+	switch intstr.Type {
+	case Int:
+		return json.Marshal(intstr.IntVal)
+	case String:
+		return json.Marshal(intstr.StrVal)
+	default:
+		return []byte{}, fmt.Errorf("impossible IntOrString.Type")
+	}
 }

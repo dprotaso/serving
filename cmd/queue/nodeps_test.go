@@ -25,6 +25,7 @@ import (
 func TestNoDeps(t *testing.T) {
 	depcheck.AssertNoDependency(t, map[string][]string{
 		"knative.dev/serving/cmd/queue": append(depcheck.KnownHeavyDependencies,
+			"k8s.io/apimachinery/pkg/apis/meta/v1", // 3MB
 			"k8s.io/api/core/v1",
 			"k8s.io/api/apps/v1"),
 	})
