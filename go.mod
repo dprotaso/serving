@@ -52,3 +52,5 @@ require (
 	knative.dev/pkg v0.0.0-20211028235650-5d9d300c2e40
 	sigs.k8s.io/yaml v1.3.0
 )
+
+replace knative.dev/hack => ../hack
