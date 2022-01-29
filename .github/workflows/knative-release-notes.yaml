@@ -44,6 +44,7 @@ jobs:
           go-version: 1.17.x
 
       - name: Install Dependencies
+        # https://github.com/kubernetes/release/tree/master/cmd/release-notes
         run: go install k8s.io/release/cmd/release-notes@latest
 
       - name: Check out code
@@ -55,12 +56,15 @@ jobs:
 
       - name: Generate Notes
         run: |
-          ORG=$(echo '${{ github.repository }}' | awk -F '/' '{print $1}')
-          REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          BRANCH="${{ github.event.inputs.branch }}"
+          # The release-notes tool access ENV vars as options
+          # https://github.com/kubernetes/release/tree/master/cmd/release-notes#options
 
-          START_REV=${{ github.event.inputs.start-rev }}
-          END_REV=${{ github.event.inputs.end-rev }}
+          export ORG=$(echo '${{ github.repository }}' | awk -F '/' '{print $1}')
+          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
+          export BRANCH="${{ github.event.inputs.branch }}"
+
+          export START_REV=${{ github.event.inputs.start-rev }}
+          export END_REV=${{ github.event.inputs.end-rev }}
 
           if [[ -z "$END_REV" ]]; then
             END_REV="origin/$BRANCH"
@@ -69,7 +73,6 @@ jobs:
           # If start rev isn't set find the merge base of
           # the target branch and the previous branch
           if [[ -z "$START_REV" ]]; then
-
             BRANCHES=$(mktemp)
             # List of branches sorted by semver descending
             git branch -r -l "*release-*" | sed 's/ //g' | sort -Vr > "$BRANCHES"
@@ -82,7 +85,7 @@ jobs:
               LAST_BRANCH="$(grep -A 1 -n "$BRANCH" "$BRANCHES" | tail -n1)"
             fi
 
-            START_SHA=$(git merge-base $LAST_BRANCH origin/$BRANCH)
+            export START_SHA=$(git merge-base $LAST_BRANCH origin/$BRANCH)
           fi
 
           release-notes \
