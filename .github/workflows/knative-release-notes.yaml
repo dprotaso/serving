@@ -76,7 +76,7 @@ jobs:
           if [[ -z "$START_REV" ]]; then
             BRANCHES=$(mktemp)
             # List of branches sorted by semver descending
-            git branch -r -l "*release-*" | sed 's/ //g' | sort -Vr > "$BRANCHES"
+            git branch -r -l "origin/release-*" | sed 's/ //g' | sort -Vr > "$BRANCHES"
 
             if [[ "$BRANCH" == "main" ]]; then
               LAST_BRANCH="$(head -n1 "$BRANCHES")"
