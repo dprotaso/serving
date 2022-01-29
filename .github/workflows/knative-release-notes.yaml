@@ -82,18 +82,13 @@ jobs:
               LAST_BRANCH="$(grep -A 1 -n "$BRANCH" "$BRANCHES" | tail -n1)"
             fi
 
-            START_REV=$(git merge-base $LAST_BRANCH origin/$BRANCH)
+            START_SHA=$(git merge-base $LAST_BRANCH origin/$BRANCH)
           fi
 
           release-notes \
            --required-author="" \
            --output=release-notes.md \
-           --org="$ORG" \
-           --repo="$REPO" \
            --repo-path="$PWD" \
-           --branch="$BRANCH" \
-           --start-rev="$START_REV" \
-           --end-rev="$END_REV"
 
       - name: Display Notes
         run: |
