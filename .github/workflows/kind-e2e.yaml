@@ -137,14 +137,14 @@ jobs:
         #   ingress-class: kourier
         #   enable-tls: 1
 
-        # - test-suite: runtime
-        #   test-path: ./test/conformance/runtime/...
+        - test-suite: runtime
+          test-path: ./test/conformance/runtime/...
 
-        # - test-suite: api
-        #   test-path: ./test/conformance/api/...
+        - test-suite: api
+          test-path: ./test/conformance/api/...
 
-        # - test-suite: e2e
-        #   test-path: ./test/e2e
+        - test-suite: e2e
+          test-path: ./test/e2e
 
     env:
       KIND: 1
