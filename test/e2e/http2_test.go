@@ -74,6 +74,7 @@ func TestHelloHTTP2WithPortNameH2C(t *testing.T) {
 // TODO(knative/serving#4283): Once the feature is implemented, this test
 // should succeed.
 func TestHelloHTTP2WithEmptyPortName(t *testing.T) {
+	t.Skip("HTTP2 with empty port name is not implemented yet. See: https://github.com/knative/serving/issues/4283")
 	t.Parallel()
 
 	clients := Setup(t)
@@ -107,6 +108,4 @@ func TestHelloHTTP2WithEmptyPortName(t *testing.T) {
 	); err != nil {
 		t.Fatalf("The endpoint %s for Route %s didn't serve the expected status code %v: %v", url, names.Route, http.StatusUpgradeRequired, err)
 	}
-
-	t.Skip("HTP2 with empty port name is not implemented yet. See: https://github.com/knative/serving/issues/4283")
 }
