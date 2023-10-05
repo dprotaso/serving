@@ -73,24 +73,25 @@ func (c *Reconciler) checkAndUpdateDeployment(ctx context.Context, rev *v1.Revis
 		return nil, fmt.Errorf("failed to update deployment: %w", err)
 	}
 
+	// filter wantConfig
 	haveConfig, err := applyapps.ExtractDeployment(have, "controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract deployment", err)
+		return nil, fmt.Errorf("failed to extract deployment %w", err)
 	}
 
 	// If the spec we want is the spec we have, then we're good.
 	if equality.Semantic.DeepEqual(haveConfig, wantConfig) {
 		logger.Info("deployments are the same")
 		return have, nil
-	} else {
-		// If what comes back from the update (with defaults applied by the API server) is the same
-		// as what we have then nothing changed.
-		diff, err := kmp.SafeDiff(haveConfig, wantConfig)
-		if err != nil {
-			return nil, err
-		}
-		logger.Info("Reconciling deployment diff (-desired, +observed): ", diff)
 	}
+
+	// If what comes back from the update (with defaults applied by the API server) is the same
+	// as what we have then nothing changed.
+	diff, err := kmp.SafeDiff(haveConfig, wantConfig)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("Reconciling deployment diff (-desired, +observed): ", diff)
 
 	return c.kubeclient.AppsV1().Deployments(*wantConfig.Namespace).Apply(ctx, wantConfig, metav1.ApplyOptions{
 		FieldManager: "controller",
