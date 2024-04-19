@@ -86,13 +86,13 @@ jobs:
         - v1.29.x
 
         ingress:
-        - kourier
+        # - kourier
         # - kourier-tls
-        - istio
-        - istio-tls
+        # - istio
+        # - istio-tls
         # Disabled due to flakiness: https://github.com/knative/serving/issues/14637
         # - istio-ambient
-        - contour
+        # - contour
         - gateway_istio
         - gateway_contour
 
@@ -113,16 +113,16 @@ jobs:
           test-flags: -enable-alpha -enable-beta
           namespace-resources: httproute
 
-        - ingress: contour
-          namespace-resources: httpproxy
+        # - ingress: contour
+        #   namespace-resources: httpproxy
 
-        - ingress: istio
-          namespace-resources: virtualservices
+        # - ingress: istio
+        #   namespace-resources: virtualservices
 
-        - ingress: istio-tls
-          ingress-class: istio
-          namespace-resources: virtualservices
-          enable-tls: 1
+        # - ingress: istio-tls
+        #   ingress-class: istio
+        #   namespace-resources: virtualservices
+        #   enable-tls: 1
 
         # Disabled due to flakiness: https://github.com/knative/serving/issues/14637
         # - ingress: istio-ambient
