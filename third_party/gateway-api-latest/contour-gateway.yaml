@@ -72,6 +72,14 @@ spec:
     enableExternalNameService: true
     featureFlags:
       - "useEndpointSlices"
+  envoy:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 1000m
+        memory: 1000Mi
   contour:
     deployment:
       replicas: 1
@@ -145,6 +153,13 @@ spec:
     featureFlags:
       - "useEndpointSlices"
   envoy:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 1000m
+        memory: 1000Mi
     networkPublishing:
       type: ClusterIPService
   contour:
