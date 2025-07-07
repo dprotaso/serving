@@ -1,0 +1,118 @@
+/*
+Copyright 2025 The Knative Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package observability
+
+import (
+	"fmt"
+	texttemplate "text/template"
+
+	configmap "knative.dev/pkg/configmap/parser"
+	pkgo11y "knative.dev/pkg/observability"
+	metrics "knative.dev/pkg/observability/metrics"
+)
+
+const (
+	// DefaultLogURLTemplate is used to set the default log url template
+	DefaultLogURLTemplate = ""
+
+	// DefaultRequestLogTemplate is the default format for emitting request logs.
+	DefaultRequestLogTemplate = `{"httpRequest": {"requestMethod": "{{.Request.Method}}", "requestUrl": "{{js .Request.RequestURI}}", "requestSize": "{{.Request.ContentLength}}", "status": {{.Response.Code}}, "responseSize": "{{.Response.Size}}", "userAgent": "{{js .Request.UserAgent}}", "remoteIp": "{{js .Request.RemoteAddr}}", "serverIp": "{{.Revision.PodIP}}", "referer": "{{js .Request.Referer}}", "latency": "{{.Response.Latency}}s", "protocol": "{{.Request.Proto}}"}, "traceId": "{{index .Request.Header "X-B3-Traceid"}}"}`
+
+	// ReqLogTemplateKey is the CM key for the request log template.
+	RequestLogTemplateKey = "logging.request-log-template"
+
+	// EnableReqLogKey is the CM key to enable request log.
+	EnableRequestLogKey = "logging.enable-request-log"
+
+	// EnableProbeReqLogKey is the CM key to enable request logs for probe requests.
+	EnableProbeRequestLogKey = "logging.enable-probe-request-log"
+)
+
+type Config struct {
+	*pkgo11y.Config
+
+	RequestMetrics metrics.Config
+
+	// EnableVarLogCollection specifies whether the logs under /var/log/ should be available
+	// for collection on the host node by the fluentd daemon set.
+	EnableVarLogCollection bool
+
+	// LoggingURLTemplate is a string containing the logging url template where
+	// the variable REVISION_UID will be replaced with the created revision's UID.
+	LoggingURLTemplate string
+
+	// EnableRequestLog enables activator/queue-proxy to write request logs.
+	EnableRequestLog bool
+
+	// RequestLogTemplate is the go template to use to shape the request logs.
+	RequestLogTemplate string
+
+	// EnableProbeRequestLog enables queue-proxy to write health check probe request logs.
+	EnableProbeRequestLog bool
+}
+
+func (c *Config) Validate() error {
+	if c.RequestLogTemplate == "" && c.EnableRequestLog {
+		return fmt.Errorf("%q was set to true, but no %q was specified", EnableRequestLogKey, RequestLogTemplateKey)
+	}
+
+	if c.RequestLogTemplate != "" {
+		// Verify that we get valid templates.
+		if _, err := texttemplate.New("requestLog").Parse(c.RequestLogTemplate); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		Config:             pkgo11y.DefaultConfig(),
+		RequestMetrics:     metrics.DefaultConfig(),
+		LoggingURLTemplate: DefaultLogURLTemplate,
+		RequestLogTemplate: DefaultRequestLogTemplate,
+	}
+}
+
+func NewFromMap(m map[string]string) (*Config, error) {
+	var c = DefaultConfig()
+
+	if cfg, err := pkgo11y.NewFromMap(m); err != nil {
+		return nil, err
+	} else {
+		c.Config = cfg
+	}
+
+	if rm, err := metrics.NewFromMapWithPrefix("request-", m); err != nil {
+		return nil, err
+	} else {
+		c.RequestMetrics = rm
+	}
+
+	err := configmap.Parse(m,
+		configmap.As("logging.enable-var-log-collection", &c.EnableVarLogCollection),
+		configmap.As("logging.revision-url-template", &c.LoggingURLTemplate),
+		configmap.As(RequestLogTemplateKey, &c.RequestLogTemplate),
+		configmap.As(EnableRequestLogKey, &c.EnableRequestLog),
+		configmap.As(EnableProbeRequestLogKey, &c.EnableProbeRequestLog),
+	)
+	if err != nil {
+		return c, err
+	}
+
+	return c, c.Validate()
+}
