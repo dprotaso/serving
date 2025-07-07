@@ -22,7 +22,7 @@ metadata:
     app.kubernetes.io/component: observability
     app.kubernetes.io/version: devel
   annotations:
-    knative.dev/example-checksum: "c8d878f6"
+    knative.dev/example-checksum: "6bc8b73d"
 data:
   _example: |
     ################################
@@ -100,7 +100,7 @@ data:
     #
     # When the protocol is prometheus the endpoint can accept a 'host:port' string to customize the
     # listening host interface and port.
-    metrics-endpoint: http://promstack-kube-prometheus-prometheus.observability:9090/api/v1/otlp/v1/metrics
+    metrics-endpoint: http://example.com/v1/traces
 
     # metrics-export-interval specifies the global metrics reporting period for control and data plane components.
     # If a zero or negative value is passed the default reporting OTel period is used (60 secs).

@@ -43,27 +43,35 @@ const (
 	EnableProbeRequestLogKey = "logging.enable-probe-request-log"
 )
 
-type Config struct {
-	*pkgo11y.Config
+type (
+	BaseConfig    = pkgo11y.Config
+	MetricsConfig = pkgo11y.MetricsConfig
+	RuntimeConfig = pkgo11y.RuntimeConfig
+	TracingConfig = pkgo11y.TracingConfig
+)
 
-	RequestMetrics metrics.Config
+// +k8s:deepcopy-gen=true
+type Config struct {
+	BaseConfig
+
+	RequestMetrics MetricsConfig `json:"requestMetrics"`
 
 	// EnableVarLogCollection specifies whether the logs under /var/log/ should be available
 	// for collection on the host node by the fluentd daemon set.
-	EnableVarLogCollection bool
+	EnableVarLogCollection bool `json:",omitempty"`
 
 	// LoggingURLTemplate is a string containing the logging url template where
 	// the variable REVISION_UID will be replaced with the created revision's UID.
-	LoggingURLTemplate string
+	LoggingURLTemplate string `json:",omitempty"`
 
 	// EnableRequestLog enables activator/queue-proxy to write request logs.
-	EnableRequestLog bool
+	EnableRequestLog bool `json:"enableRequestLog,omitempty"`
 
 	// RequestLogTemplate is the go template to use to shape the request logs.
-	RequestLogTemplate string
+	RequestLogTemplate string `json:"requestLogTemplate,omitempty"`
 
 	// EnableProbeRequestLog enables queue-proxy to write health check probe request logs.
-	EnableProbeRequestLog bool
+	EnableProbeRequestLog bool `json:"enableProbeRequestLog,omitempty"`
 }
 
 func (c *Config) Validate() error {
@@ -82,7 +90,7 @@ func (c *Config) Validate() error {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Config:             pkgo11y.DefaultConfig(),
+		BaseConfig:         *pkgo11y.DefaultConfig(),
 		RequestMetrics:     metrics.DefaultConfig(),
 		LoggingURLTemplate: DefaultLogURLTemplate,
 		RequestLogTemplate: DefaultRequestLogTemplate,
@@ -95,7 +103,7 @@ func NewFromMap(m map[string]string) (*Config, error) {
 	if cfg, err := pkgo11y.NewFromMap(m); err != nil {
 		return nil, err
 	} else {
-		c.Config = cfg
+		c.BaseConfig = *cfg
 	}
 
 	if rm, err := metrics.NewFromMapWithPrefix("request-", m); err != nil {
