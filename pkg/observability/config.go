@@ -17,6 +17,7 @@ limitations under the License.
 package observability
 
 import (
+	"context"
 	"fmt"
 	texttemplate "text/template"
 
@@ -115,4 +116,20 @@ func NewFromMap(m map[string]string) (*Config, error) {
 	}
 
 	return c, c.Validate()
+}
+
+type cfgKey struct{}
+
+// WithConfig associates a observability configuration with the context.
+func WithConfig(ctx context.Context, cfg *Config) context.Context {
+	return context.WithValue(ctx, cfgKey{}, cfg)
+}
+
+// GetConfig gets the observability config from the provided context.
+func GetConfig(ctx context.Context) *Config {
+	untyped := ctx.Value(cfgKey{})
+	if untyped == nil {
+		return nil
+	}
+	return untyped.(*Config)
 }
