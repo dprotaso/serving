@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"go.opencensus.io/trace"
+	"go.opentelemetry.io/otel/trace"
 	netheader "knative.dev/networking/pkg/http/header"
 	netstats "knative.dev/networking/pkg/http/stats"
 	"knative.dev/serving/pkg/activator"
@@ -30,18 +30,21 @@ import (
 
 // ProxyHandler sends requests to the `next` handler at a rate controlled by
 // the passed `breaker`, while recording stats to `stats`.
-func ProxyHandler(breaker *Breaker, stats *netstats.RequestStats, tracingEnabled bool, next http.Handler) http.HandlerFunc {
+func ProxyHandler(
+	tracer trace.Tracer,
+	breaker *Breaker,
+	stats *netstats.RequestStats,
+	next http.Handler,
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if netheader.IsKubeletProbe(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		if tracingEnabled {
-			proxyCtx, proxySpan := trace.StartSpan(r.Context(), "queue_proxy")
-			r = r.WithContext(proxyCtx)
-			defer proxySpan.End()
-		}
+		proxyCtx, proxySpan := tracer.Start(r.Context(), "queue_proxy")
+		r = r.WithContext(proxyCtx)
+		defer proxySpan.End()
 
 		// Metrics for autoscaling.
 		in, out := netstats.ReqIn, netstats.ReqOut
@@ -56,10 +59,7 @@ func ProxyHandler(breaker *Breaker, stats *netstats.RequestStats, tracingEnabled
 
 		// Enforce queuing and concurrency limits.
 		if breaker != nil {
-			var waitSpan *trace.Span
-			if tracingEnabled {
-				_, waitSpan = trace.StartSpan(r.Context(), "queue_wait")
-			}
+			_, waitSpan := tracer.Start(r.Context(), "queue_wait")
 			if err := breaker.Maybe(r.Context(), func() {
 				waitSpan.End()
 				next.ServeHTTP(w, r)

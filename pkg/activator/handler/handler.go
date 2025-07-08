@@ -36,6 +36,7 @@ import (
 	netheader "knative.dev/networking/pkg/http/header"
 	netproxy "knative.dev/networking/pkg/http/proxy"
 	"knative.dev/pkg/logging/logkey"
+	"knative.dev/pkg/network"
 	pkghandler "knative.dev/pkg/network/handlers"
 	"knative.dev/serving/pkg/activator"
 	apiconfig "knative.dev/serving/pkg/apis/config"
@@ -79,6 +80,10 @@ func New(_ context.Context,
 	transport = otelhttp.NewTransport(
 		transport,
 		otelhttp.WithTracerProvider(tp),
+		otelhttp.WithFilter(func(r *http.Request) bool {
+			// Don't trace kubelet probes
+			return !network.IsKubeletProbe(r)
+		}),
 		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 			if r.URL.Path == "" {
 				return r.Method + " /"

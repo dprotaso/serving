@@ -22,13 +22,16 @@ import (
 	"net/http"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+
 	netheader "knative.dev/networking/pkg/http/header"
 	netproxy "knative.dev/networking/pkg/http/proxy"
 	netstats "knative.dev/networking/pkg/http/stats"
+	"knative.dev/pkg/network"
 	pkghandler "knative.dev/pkg/network/handlers"
-	"knative.dev/pkg/tracing"
-	tracingconfig "knative.dev/pkg/tracing/config"
 	"knative.dev/serving/pkg/activator"
 	pkghttp "knative.dev/serving/pkg/http"
 	"knative.dev/serving/pkg/http/handler"
@@ -43,8 +46,11 @@ func mainHandler(
 	prober func() bool,
 	stats *netstats.RequestStats,
 	logger *zap.SugaredLogger,
+	mp metric.MeterProvider,
+	tp trace.TracerProvider,
 ) (http.Handler, *pkghandler.Drainer) {
 	target := net.JoinHostPort("127.0.0.1", env.UserPort)
+	tracer := tp.Tracer("knative.dev/serving/queueproxy")
 
 	httpProxy := pkghttp.NewHeaderPruningReverseProxy(target, pkghttp.NoHostOverride, activator.RevisionHeaders, false /* use HTTP */)
 	httpProxy.Transport = transport
@@ -53,7 +59,7 @@ func mainHandler(
 	httpProxy.FlushInterval = netproxy.FlushInterval
 
 	breaker := buildBreaker(logger, env)
-	tracingEnabled := env.TracingConfigBackend != tracingconfig.None
+
 	timeout := time.Duration(env.RevisionTimeoutSeconds) * time.Second
 	responseStartTimeout := 0 * time.Second
 	if env.RevisionResponseStartTimeoutSeconds != 0 {
@@ -67,22 +73,14 @@ func mainHandler(
 	// Note: innermost handlers are specified first, ie. the last handler in the chain will be executed first.
 	var composedHandler http.Handler = httpProxy
 
-	metricsSupported := supportsMetrics(ctx, logger, env)
-	if metricsSupported {
-		composedHandler = requestAppMetricsHandler(logger, composedHandler, breaker, env)
-	}
-	composedHandler = queue.ProxyHandler(breaker, stats, tracingEnabled, composedHandler)
+	composedHandler = requestAppMetricsHandler(logger, composedHandler, breaker, env)
+	composedHandler = queue.ProxyHandler(tracer, breaker, stats, composedHandler)
 	composedHandler = queue.ForwardedShimHandler(composedHandler)
 	composedHandler = handler.NewTimeoutHandler(composedHandler, "request timeout", func(r *http.Request) (time.Duration, time.Duration, time.Duration) {
 		return timeout, responseStartTimeout, idleTimeout
 	})
 
-	if metricsSupported {
-		composedHandler = requestMetricsHandler(logger, composedHandler, env)
-	}
-	if tracingEnabled {
-		composedHandler = tracing.HTTPSpanMiddleware(composedHandler)
-	}
+	composedHandler = requestMetricsHandler(logger, composedHandler, env)
 
 	composedHandler = withFullDuplex(composedHandler, env.EnableHTTPFullDuplex, logger)
 
@@ -91,15 +89,27 @@ func mainHandler(
 		// Add Activator probe header to the drainer so it can handle probes directly from activator
 		HealthCheckUAPrefixes: []string{netheader.ActivatorUserAgent, netheader.AutoscalingUserAgent},
 		Inner:                 composedHandler,
-		HealthCheck:           health.ProbeHandler(prober, tracingEnabled),
+		HealthCheck:           health.ProbeHandler(tracer, prober),
 	}
 	composedHandler = drainer
 
-	if env.ServingEnableRequestLog {
+	if env.Observability.EnableRequestLog {
 		// We want to capture the probes/healthchecks in the request logs.
 		// Hence we need to have RequestLogHandler be the first one.
 		composedHandler = requestLogHandler(logger, composedHandler, env)
 	}
+
+	composedHandler = otelhttp.NewHandler(
+		composedHandler,
+		"queue",
+		otelhttp.WithMeterProvider(mp),
+		otelhttp.WithTracerProvider(tp),
+		otelhttp.WithFilter(func(r *http.Request) bool {
+			// Don't trace kubelet probes
+			return !network.IsKubeletProbe(r)
+		}),
+	)
+
 	return composedHandler, drainer
 }
 
