@@ -33,7 +33,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -44,8 +44,8 @@ import (
 	nethttp "knative.dev/networking/pkg/http"
 	netheader "knative.dev/networking/pkg/http/header"
 	netprober "knative.dev/networking/pkg/prober"
-	endpointsinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/endpoints"
 	serviceinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/service"
+	endpointsliceinformer "knative.dev/pkg/client/injection/kube/informers/discovery/v1/endpointslice"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/logging/logkey"
@@ -493,8 +493,8 @@ func newRevisionBackendsManagerWithProbeFrequency(ctx context.Context, tr http.R
 		logger:           logging.FromContext(ctx),
 		probeFrequency:   probeFreq,
 	}
-	endpointsInformer := endpointsinformer.Get(ctx)
-	endpointsInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
+	endpointSliceInformer := endpointsliceinformer.Get(ctx)
+	endpointSliceInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: reconciler.ChainFilterFuncs(
 			reconciler.LabelExistsFilterFunc(serving.RevisionUID),
 			// We are only interested in the private services, since that is
@@ -583,7 +583,7 @@ func (rbm *revisionBackendsManager) getOrCreateRevisionWatcher(revID types.Names
 	return rwCh, nil
 }
 
-// endpointsUpdated is a handler function to be used by the Endpoints informer.
+// endpointsUpdated is a handler function to be used by the EndpointSlice informer.
 // It updates the endpoints in the RevisionBackendsManager if the hosts changed
 func (rbm *revisionBackendsManager) endpointsUpdated(newObj interface{}) {
 	// Ignore the updates when we've terminated.
@@ -592,15 +592,15 @@ func (rbm *revisionBackendsManager) endpointsUpdated(newObj interface{}) {
 		return
 	default:
 	}
-	endpoints := newObj.(*corev1.Endpoints)
-	revID := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Labels[serving.RevisionLabelKey]}
+	endpointSlice := newObj.(*discoveryv1.EndpointSlice)
+	revID := types.NamespacedName{Namespace: endpointSlice.Namespace, Name: endpointSlice.Labels[serving.RevisionLabelKey]}
 
 	rw, err := rbm.getOrCreateRevisionWatcher(revID)
 	if err != nil {
 		rbm.logger.Errorw("Failed to get revision watcher", zap.Error(err), zap.String(logkey.Key, revID.String()))
 		return
 	}
-	ready, notReady := endpointsToDests(endpoints, pkgnet.ServicePortName(rw.protocol))
+	ready, notReady := endpointsToDests(endpointSlice, pkgnet.ServicePortName(rw.protocol))
 	select {
 	case <-rbm.ctx.Done():
 		return
@@ -624,7 +624,7 @@ func (rbm *revisionBackendsManager) endpointsDeleted(obj interface{}) {
 		return
 	default:
 	}
-	ep := obj.(*corev1.Endpoints)
+	ep := obj.(*discoveryv1.EndpointSlice)
 	revID := types.NamespacedName{Namespace: ep.Namespace, Name: ep.Labels[serving.RevisionLabelKey]}
 
 	rbm.logger.Debugw("Deleting endpoint", zap.String(logkey.Key, revID.String()))

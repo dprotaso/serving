@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,7 +37,7 @@ import (
 
 	pkgnet "knative.dev/networking/pkg/apis/networking"
 	fakekubeclient "knative.dev/pkg/client/injection/kube/client/fake"
-	fakeendpointsinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/endpoints/fake"
+	fakeendpointsliceinformer "knative.dev/pkg/client/injection/kube/informers/discovery/v1/endpointslice/fake"
 	. "knative.dev/pkg/logging/testing"
 	rtesting "knative.dev/pkg/reconciler/testing"
 	"knative.dev/serving/pkg/apis/serving"
@@ -491,9 +492,9 @@ func TestThrottlerSuccesses(t *testing.T) {
 			servfake := fakeservingclient.Get(ctx)
 			fake := fakekubeclient.Get(ctx)
 			revisions := fakerevisioninformer.Get(ctx)
-			endpoints := fakeendpointsinformer.Get(ctx)
+			endpointSlices := fakeendpointsliceinformer.Get(ctx)
 
-			waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpoints.Informer(),
+			waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpointSlices.Informer(),
 				revisions.Informer())
 			if err != nil {
 				t.Fatal("Failed to start informers:", err)
@@ -521,7 +522,9 @@ func TestThrottlerSuccesses(t *testing.T) {
 				waitInformers()
 			}()
 
-			publicEp := &corev1.Endpoints{
+			port := int32(8012)
+			portName := "http"
+			publicEp := &discoveryv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testRevision,
 					Namespace: testNamespace,
@@ -530,13 +533,22 @@ func TestThrottlerSuccesses(t *testing.T) {
 						serving.RevisionLabelKey:  testRevision,
 					},
 				},
-				Subsets: []corev1.EndpointSubset{
-					*epSubset(8012, "http", []string{"130.0.0.2"}, nil),
-				},
+				AddressType: discoveryv1.AddressTypeIPv4,
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     &portName,
+					Port:     &port,
+					Protocol: func() *corev1.Protocol { p := corev1.ProtocolTCP; return &p }(),
+				}},
+				Endpoints: []discoveryv1.Endpoint{{
+					Addresses: []string{"130.0.0.2"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready: func() *bool { r := true; return &r }(),
+					},
+				}},
 			}
 
-			fake.CoreV1().Endpoints(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
-			endpoints.Informer().GetIndexer().Add(publicEp)
+			fake.DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
+			endpointSlices.Informer().GetIndexer().Add(publicEp)
 
 			revID := types.NamespacedName{Namespace: testNamespace, Name: testRevision}
 			rt, err := throttler.getOrCreateRevisionThrottler(revID)
@@ -712,11 +724,11 @@ func TestActivatorsIndexUpdate(t *testing.T) {
 	ctx, cancel, _ := rtesting.SetupFakeContextWithCancel(t)
 
 	fake := fakekubeclient.Get(ctx)
-	endpoints := fakeendpointsinformer.Get(ctx)
+	endpointSlices := fakeendpointsliceinformer.Get(ctx)
 	servfake := fakeservingclient.Get(ctx)
 	revisions := revisioninformer.Get(ctx)
 
-	waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpoints.Informer(), revisions.Informer())
+	waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpointSlices.Informer(), revisions.Informer())
 	if err != nil {
 		t.Fatal("Failed to start informers:", err)
 	}
@@ -748,7 +760,7 @@ func TestActivatorsIndexUpdate(t *testing.T) {
 	}
 
 	// Add activator endpoint with 2 activators.
-	publicEp := &corev1.Endpoints{
+	publicEp := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testRevision,
 			Namespace: testNamespace,
@@ -757,12 +769,29 @@ func TestActivatorsIndexUpdate(t *testing.T) {
 				serving.RevisionLabelKey:  testRevision,
 			},
 		},
-		Subsets: []corev1.EndpointSubset{
-			*epSubset(8013, "http2", []string{"130.0.0.1", "130.0.0.2"}, nil),
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Ports: []discoveryv1.EndpointPort{{
+			Name:     func() *string { s := "http2"; return &s }(),
+			Port:     func() *int32 { i := int32(8013); return &i }(),
+			Protocol: func() *corev1.Protocol { p := corev1.ProtocolTCP; return &p }(),
+		}},
+		Endpoints: []discoveryv1.Endpoint{
+			{
+				Addresses: []string{"130.0.0.1"},
+				Conditions: discoveryv1.EndpointConditions{
+					Ready: func() *bool { r := true; return &r }(),
+				},
+			},
+			{
+				Addresses: []string{"130.0.0.2"},
+				Conditions: discoveryv1.EndpointConditions{
+					Ready: func() *bool { r := true; return &r }(),
+				},
+			},
 		},
 	}
-	fake.CoreV1().Endpoints(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
-	endpoints.Informer().GetIndexer().Add(publicEp)
+	fake.DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
+	endpointSlices.Informer().GetIndexer().Add(publicEp)
 
 	rt, err := throttler.getOrCreateRevisionThrottler(revID)
 	if err != nil {
@@ -788,12 +817,16 @@ func TestActivatorsIndexUpdate(t *testing.T) {
 		t.Fatalf("len(assignedTrackers) = %d, want %d", got, want)
 	}
 
-	publicEp.Subsets = []corev1.EndpointSubset{
-		*epSubset(8013, "http2", []string{"130.0.0.2"}, nil),
-	}
+	// Update the endpoint slice to have only one endpoint
+	publicEp.Endpoints = []discoveryv1.Endpoint{{
+		Addresses: []string{"130.0.0.2"},
+		Conditions: discoveryv1.EndpointConditions{
+			Ready: func() *bool { r := true; return &r }(),
+		},
+	}}
 
-	fake.CoreV1().Endpoints(testNamespace).Update(ctx, publicEp, metav1.UpdateOptions{})
-	endpoints.Informer().GetIndexer().Update(publicEp)
+	fake.DiscoveryV1().EndpointSlices(testNamespace).Update(ctx, publicEp, metav1.UpdateOptions{})
+	endpointSlices.Informer().GetIndexer().Update(publicEp)
 
 	// Verify the index was computed.
 	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
@@ -808,11 +841,11 @@ func TestMultipleActivators(t *testing.T) {
 	ctx, cancel, _ := rtesting.SetupFakeContextWithCancel(t)
 
 	fake := fakekubeclient.Get(ctx)
-	endpoints := fakeendpointsinformer.Get(ctx)
+	endpointSlices := fakeendpointsliceinformer.Get(ctx)
 	servfake := fakeservingclient.Get(ctx)
 	revisions := revisioninformer.Get(ctx)
 
-	waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpoints.Informer(), revisions.Informer())
+	waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpointSlices.Informer(), revisions.Informer())
 	if err != nil {
 		t.Fatal("Failed to start informers:", err)
 	}
@@ -844,22 +877,59 @@ func TestMultipleActivators(t *testing.T) {
 	}
 
 	// Add activator endpoint with 2 activators.
-	publicEp := &corev1.Endpoints{
+
+	port := int32(8012)
+
+	portName := "http"
+
+	publicEp := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testRevision,
+			Name: testRevision,
+
 			Namespace: testNamespace,
+
 			Labels: map[string]string{
 				networking.ServiceTypeKey: string(networking.ServiceTypePublic),
-				serving.RevisionLabelKey:  testRevision,
+
+				serving.RevisionLabelKey: testRevision,
 			},
 		},
-		Subsets: []corev1.EndpointSubset{
-			*epSubset(8012, "http", []string{"130.0.0.1", "130.0.0.2"},
-				nil),
+
+		AddressType: discoveryv1.AddressTypeIPv4,
+
+		Ports: []discoveryv1.EndpointPort{{
+			Name: &portName,
+
+			Port: &port,
+
+			Protocol: func() *corev1.Protocol { p := corev1.ProtocolTCP; return &p }(),
+		}},
+
+		Endpoints: []discoveryv1.Endpoint{
+			{
+				Addresses: []string{"130.0.0.1"},
+
+				Conditions: discoveryv1.EndpointConditions{
+					Ready: func() *bool { r := true; return &r }(),
+				},
+			},
+
+			{
+				Addresses: []string{"130.0.0.2"},
+
+				Conditions: discoveryv1.EndpointConditions{
+					Ready: func() *bool { r := true; return &r }(),
+				},
+			},
 		},
 	}
-	fake.CoreV1().Endpoints(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
-	endpoints.Informer().GetIndexer().Add(publicEp)
+
+	fake.DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
+
+	endpointSlices.Informer().GetIndexer().Add(publicEp)
+
+	fake.DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, publicEp, metav1.CreateOptions{})
+	endpointSlices.Informer().GetIndexer().Add(publicEp)
 
 	rt, err := throttler.getOrCreateRevisionThrottler(revID)
 	if err != nil {

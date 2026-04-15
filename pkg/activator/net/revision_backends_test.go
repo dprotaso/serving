@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -34,8 +35,8 @@ import (
 	pkgnet "knative.dev/networking/pkg/apis/networking"
 	netcfg "knative.dev/networking/pkg/config"
 	fakekubeclient "knative.dev/pkg/client/injection/kube/client/fake"
-	fakeendpointsinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/endpoints/fake"
 	fakeserviceinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/service/fake"
+	fakeendpointsliceinformer "knative.dev/pkg/client/injection/kube/informers/discovery/v1/endpointslice/fake"
 	pkgnetwork "knative.dev/pkg/network"
 	"knative.dev/pkg/ptr"
 	rtesting "knative.dev/pkg/reconciler/testing"
@@ -612,28 +613,32 @@ func assertChClosed(t *testing.T, ch chan struct{}) {
 	}
 }
 
-func epSubset(port int32, portName string, ips, notReadyIps []string) *corev1.EndpointSubset {
-	ss := &corev1.EndpointSubset{
-		Ports: []corev1.EndpointPort{{
-			Name: portName,
-			Port: port,
-		}},
-	}
-	for _, ip := range ips {
-		ss.Addresses = append(ss.Addresses, corev1.EndpointAddress{IP: ip})
-	}
-	for _, notReady := range notReadyIps {
-		ss.NotReadyAddresses = append(ss.NotReadyAddresses, corev1.EndpointAddress{IP: notReady})
-	}
-	return ss
-}
-
-func ep(revL string, port int32, portName string, ips ...string) *corev1.Endpoints {
+func ep(revL string, port int32, portName string, ips ...string) *discoveryv1.EndpointSlice {
 	return epNotReady(revL, port, portName, ips, nil)
 }
 
-func epNotReady(revL string, port int32, portName string, readyIps, notReadyIps []string) *corev1.Endpoints {
-	return &corev1.Endpoints{
+func epNotReady(revL string, port int32, portName string, readyIps, notReadyIps []string) *discoveryv1.EndpointSlice {
+	endpoints := make([]discoveryv1.Endpoint, 0, len(readyIps)+len(notReadyIps))
+
+	for _, ip := range readyIps {
+		endpoints = append(endpoints, discoveryv1.Endpoint{
+			Addresses: []string{ip},
+			Conditions: discoveryv1.EndpointConditions{
+				Ready: func() *bool { r := true; return &r }(),
+			},
+		})
+	}
+
+	for _, ip := range notReadyIps {
+		endpoints = append(endpoints, discoveryv1.Endpoint{
+			Addresses: []string{ip},
+			Conditions: discoveryv1.EndpointConditions{
+				Ready: func() *bool { r := false; return &r }(),
+			},
+		})
+	}
+
+	return &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: revL + "-ep",
 			Labels: map[string]string{
@@ -642,7 +647,13 @@ func epNotReady(revL string, port int32, portName string, readyIps, notReadyIps 
 				serving.RevisionLabelKey:  revL,
 			},
 		},
-		Subsets: []corev1.EndpointSubset{*epSubset(port, portName, readyIps, notReadyIps)},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Ports: []discoveryv1.EndpointPort{{
+			Name:     &portName,
+			Port:     &port,
+			Protocol: func() *corev1.Protocol { p := corev1.ProtocolTCP; return &p }(),
+		}},
+		Endpoints: endpoints,
 	}
 }
 
@@ -650,7 +661,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 	// Make sure we wait out all the jitter in the system.
 	for _, tc := range []struct {
 		name               string
-		endpointsArr       []*corev1.Endpoints
+		endpointsArr       []*discoveryv1.EndpointSlice
 		revisions          []*v1.Revision
 		services           []*corev1.Service
 		probeHostResponses map[string][]activatortest.FakeResponse
@@ -658,7 +669,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt          int
 	}{{
 		name:         "add slow healthy",
-		endpointsArr: []*corev1.Endpoints{ep(testRevision, 1234, "http", "128.0.0.1")},
+		endpointsArr: []*discoveryv1.EndpointSlice{ep(testRevision, 1234, "http", "128.0.0.1")},
 		revisions: []*v1.Revision{
 			revisionCC1(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1),
 		},
@@ -686,7 +697,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt: 1,
 	}, {
 		name:         "add slow ready http2",
-		endpointsArr: []*corev1.Endpoints{ep(testRevision, 1234, "http2", "128.0.0.1")},
+		endpointsArr: []*discoveryv1.EndpointSlice{ep(testRevision, 1234, "http2", "128.0.0.1")},
 		revisions: []*v1.Revision{
 			revisionCC1(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolH2C),
 		},
@@ -714,7 +725,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt: 1,
 	}, {
 		name: "multiple revisions",
-		endpointsArr: []*corev1.Endpoints{
+		endpointsArr: []*discoveryv1.EndpointSlice{
 			ep("test-revision1", 1234, "http", "128.0.0.1"),
 			ep("test-revision2", 1235, "http", "128.1.0.2"),
 		},
@@ -743,7 +754,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt: 2,
 	}, {
 		name:         "no pods available, but non-mesh-related error",
-		endpointsArr: []*corev1.Endpoints{ep(testRevision, 1234, "http", "128.0.0.1")},
+		endpointsArr: []*discoveryv1.EndpointSlice{ep(testRevision, 1234, "http", "128.0.0.1")},
 		revisions: []*v1.Revision{
 			revisionCC1(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1),
 		},
@@ -764,7 +775,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt:   0,
 	}, {
 		name:         "no pod addressability",
-		endpointsArr: []*corev1.Endpoints{ep(testRevision, 1234, "http", "128.0.0.1")},
+		endpointsArr: []*discoveryv1.EndpointSlice{ep(testRevision, 1234, "http", "128.0.0.1")},
 		revisions: []*v1.Revision{
 			revisionCC1(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1),
 		},
@@ -790,7 +801,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt: 1,
 	}, {
 		name:         "unhealthy",
-		endpointsArr: []*corev1.Endpoints{ep(testRevision, 1234, "http", "128.0.0.1")},
+		endpointsArr: []*discoveryv1.EndpointSlice{ep(testRevision, 1234, "http", "128.0.0.1")},
 		revisions: []*v1.Revision{
 			revisionCC1(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1),
 		},
@@ -810,7 +821,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		expectDests: map[types.NamespacedName]revisionDestsUpdate{},
 	}, {
 		name:         "unready pod successfully probed",
-		endpointsArr: []*corev1.Endpoints{epNotReady(testRevision, 1234, "http", nil, []string{"128.0.0.1"})},
+		endpointsArr: []*discoveryv1.EndpointSlice{epNotReady(testRevision, 1234, "http", nil, []string{"128.0.0.1"})},
 		revisions: []*v1.Revision{
 			revisionCC1(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1),
 		},
@@ -835,7 +846,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt: 1,
 	}, {
 		name:         "pod with exec probe only goes ready when kubernetes agrees",
-		endpointsArr: []*corev1.Endpoints{epNotReady(testRevision, 1234, "http", nil, []string{"128.0.0.1"})},
+		endpointsArr: []*discoveryv1.EndpointSlice{epNotReady(testRevision, 1234, "http", nil, []string{"128.0.0.1"})},
 		revisions: []*v1.Revision{
 			revision(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1, 1, func(r *v1.Revision) {
 				r.Spec.Containers[0].ReadinessProbe = &corev1.Probe{
@@ -862,7 +873,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt:   0,
 	}, {
 		name:         "pod with exec probe goes ready when kubernetes agrees",
-		endpointsArr: []*corev1.Endpoints{epNotReady(testRevision, 1234, "http", []string{"128.0.0.1"}, nil)},
+		endpointsArr: []*discoveryv1.EndpointSlice{epNotReady(testRevision, 1234, "http", []string{"128.0.0.1"}, nil)},
 		revisions: []*v1.Revision{
 			revision(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1, 1, func(r *v1.Revision) {
 				r.Spec.Containers[0].ReadinessProbe = &corev1.Probe{
@@ -893,7 +904,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt: 1,
 	}, {
 		name:         "pod with sidecar container with exec probe only goes ready when kubernetes agrees",
-		endpointsArr: []*corev1.Endpoints{epNotReady(testRevision, 1234, "http", nil, []string{"128.0.0.1"})},
+		endpointsArr: []*discoveryv1.EndpointSlice{epNotReady(testRevision, 1234, "http", nil, []string{"128.0.0.1"})},
 		revisions: []*v1.Revision{
 			revision(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1, 1, func(r *v1.Revision) {
 				r.Spec.Containers[0].ReadinessProbe = &corev1.Probe{
@@ -930,7 +941,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 		updateCnt:   0,
 	}, {
 		name:         "pod with sidecar container with exec probe goes ready when kubernetes agrees",
-		endpointsArr: []*corev1.Endpoints{epNotReady(testRevision, 1234, "http", []string{"128.0.0.1"}, nil)},
+		endpointsArr: []*discoveryv1.EndpointSlice{epNotReady(testRevision, 1234, "http", []string{"128.0.0.1"}, nil)},
 		revisions: []*v1.Revision{
 			revision(types.NamespacedName{Namespace: testNamespace, Name: testRevision}, pkgnet.ProtocolHTTP1, 1, func(r *v1.Revision) {
 				//
@@ -973,7 +984,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 
 			ctx, cancel, _ := rtesting.SetupFakeContextWithCancel(t)
 
-			endpointsInformer := fakeendpointsinformer.Get(ctx)
+			endpointSlicesInformer := fakeendpointsliceinformer.Get(ctx)
 			serviceInformer := fakeserviceinformer.Get(ctx)
 			revisions := fakerevisioninformer.Get(ctx)
 
@@ -988,7 +999,7 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 				serviceInformer.Informer().GetIndexer().Add(svc)
 			}
 
-			waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpointsInformer.Informer())
+			waitInformers, err := rtesting.RunAndSyncInformers(ctx, endpointSlicesInformer.Informer())
 			if err != nil {
 				t.Fatal("Failed to start informers:", err)
 			}
@@ -1001,8 +1012,8 @@ func TestRevisionBackendManagerAddEndpoint(t *testing.T) {
 			}()
 
 			for _, ep := range tc.endpointsArr {
-				fakekubeclient.Get(ctx).CoreV1().Endpoints(testNamespace).Create(ctx, ep, metav1.CreateOptions{})
-				endpointsInformer.Informer().GetIndexer().Add(ep)
+				fakekubeclient.Get(ctx).DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, ep, metav1.CreateOptions{})
+				endpointSlicesInformer.Informer().GetIndexer().Add(ep)
 			}
 
 			revDests := make(map[types.NamespacedName]revisionDestsUpdate)
@@ -1442,9 +1453,9 @@ func TestRevisionDeleted(t *testing.T) {
 	si := fakeserviceinformer.Get(ctx)
 	si.Informer().GetIndexer().Add(svc)
 
-	ei := fakeendpointsinformer.Get(ctx)
+	ei := fakeendpointsliceinformer.Get(ctx)
 	ep := ep(testRevision, 1234, "http", "128.0.0.1")
-	fakekubeclient.Get(ctx).CoreV1().Endpoints(testNamespace).Create(ctx, ep, metav1.CreateOptions{})
+	fakekubeclient.Get(ctx).DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, ep, metav1.CreateOptions{})
 	waitInformers, err := rtesting.RunAndSyncInformers(ctx, ei.Informer())
 	if err != nil {
 		t.Fatal("Failed to start informers:", err)
@@ -1471,7 +1482,7 @@ func TestRevisionDeleted(t *testing.T) {
 		t.Error("Timedout waiting for initial response")
 	}
 	// Now delete the endpoints.
-	fakekubeclient.Get(ctx).CoreV1().Endpoints(testNamespace).Delete(ctx, ep.Name, metav1.DeleteOptions{})
+	fakekubeclient.Get(ctx).DiscoveryV1().EndpointSlices(testNamespace).Delete(ctx, ep.Name, metav1.DeleteOptions{})
 	select {
 	case r := <-rbm.updates():
 		t.Errorf("Unexpected update: %#v", r)
@@ -1484,9 +1495,9 @@ func TestServiceDoesNotExist(t *testing.T) {
 	// Tests when the service is not available.
 	ctx, cancel, _ := rtesting.SetupFakeContextWithCancel(t)
 
-	ei := fakeendpointsinformer.Get(ctx)
+	ei := fakeendpointsliceinformer.Get(ctx)
 	eps := ep(testRevision, 1234, "http", "128.0.0.1")
-	fakekubeclient.Get(ctx).CoreV1().Endpoints(testNamespace).Create(ctx, eps, metav1.CreateOptions{})
+	fakekubeclient.Get(ctx).DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, eps, metav1.CreateOptions{})
 	waitInformers, err := rtesting.RunAndSyncInformers(ctx, ei.Informer())
 	if err != nil {
 		t.Fatal("Failed to start informers:", err)
@@ -1535,9 +1546,9 @@ func TestServiceMoreThanOne(t *testing.T) {
 	// Tests when the service is not available.
 	ctx, cancel, _ := rtesting.SetupFakeContextWithCancel(t)
 
-	ei := fakeendpointsinformer.Get(ctx)
+	ei := fakeendpointsliceinformer.Get(ctx)
 	eps := ep(testRevision, 1234, "http", "128.0.0.1")
-	fakekubeclient.Get(ctx).CoreV1().Endpoints(testNamespace).Create(ctx, eps, metav1.CreateOptions{})
+	fakekubeclient.Get(ctx).DiscoveryV1().EndpointSlices(testNamespace).Create(ctx, eps, metav1.CreateOptions{})
 	waitInformers, err := rtesting.RunAndSyncInformers(ctx, ei.Informer())
 	if err != nil {
 		t.Fatal("Failed to start informers:", err)

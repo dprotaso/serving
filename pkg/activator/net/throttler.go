@@ -26,14 +26,14 @@ import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
 	pkgnet "knative.dev/networking/pkg/apis/networking"
 	netcfg "knative.dev/networking/pkg/config"
-	endpointsinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/endpoints"
+	endpointsliceinformer "knative.dev/pkg/client/injection/kube/informers/discovery/v1/endpointslice"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/kmeta"
 	"knative.dev/pkg/logging"
@@ -459,7 +459,7 @@ type Throttler struct {
 	revisionLister          servinglisters.RevisionLister
 	ipAddress               string // The IP address of this activator.
 	logger                  *zap.SugaredLogger
-	epsUpdateCh             chan *corev1.Endpoints
+	epsUpdateCh             chan *discoveryv1.EndpointSlice
 }
 
 // NewThrottler creates a new Throttler
@@ -470,7 +470,7 @@ func NewThrottler(ctx context.Context, ipAddr string) *Throttler {
 		revisionLister:     revisionInformer.Lister(),
 		ipAddress:          ipAddr,
 		logger:             logging.FromContext(ctx),
-		epsUpdateCh:        make(chan *corev1.Endpoints),
+		epsUpdateCh:        make(chan *discoveryv1.EndpointSlice),
 	}
 
 	// Watch revisions to create throttler with backlog immediately and delete
@@ -482,10 +482,10 @@ func NewThrottler(ctx context.Context, ipAddr string) *Throttler {
 	})
 
 	// Watch activator endpoint to maintain activator count
-	endpointsInformer := endpointsinformer.Get(ctx)
+	endpointSliceInformer := endpointsliceinformer.Get(ctx)
 
 	// Handles public service updates.
-	endpointsInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
+	endpointSliceInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: reconciler.LabelFilterFunc(networking.ServiceTypeKey,
 			string(networking.ServiceTypePublic), false),
 		Handler: cache.ResourceEventHandlerFuncs{
@@ -602,7 +602,7 @@ func (t *Throttler) handleUpdate(update revisionDestsUpdate) {
 	}
 }
 
-func (t *Throttler) handlePubEpsUpdate(eps *corev1.Endpoints) {
+func (t *Throttler) handlePubEpsUpdate(eps *discoveryv1.EndpointSlice) {
 	t.logger.Infof("Public EPS updates: %#v", eps)
 
 	revN := eps.Labels[serving.RevisionLabelKey]
@@ -623,7 +623,7 @@ func (t *Throttler) handlePubEpsUpdate(eps *corev1.Endpoints) {
 	}
 }
 
-func (rt *revisionThrottler) handlePubEpsUpdate(eps *corev1.Endpoints, selfIP string) {
+func (rt *revisionThrottler) handlePubEpsUpdate(eps *discoveryv1.EndpointSlice, selfIP string) {
 	// NB: this is guaranteed to be executed on a single thread.
 	epSet := healthyAddresses(eps, rt.protocol)
 	if !epSet.Has(selfIP) {
@@ -671,7 +671,7 @@ func inferIndex(eps []string, ipAddress string) int {
 }
 
 func (t *Throttler) publicEndpointsUpdated(newObj interface{}) {
-	endpoints := newObj.(*corev1.Endpoints)
+	endpoints := newObj.(*discoveryv1.EndpointSlice)
 	t.logger.Info("Updated public Endpoints: ", endpoints.Name)
 	t.epsUpdateCh <- endpoints
 }
